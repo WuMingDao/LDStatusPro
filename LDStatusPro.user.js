@@ -1,10 +1,11 @@
 // ==UserScript==
 // @name         LDStatus Pro
 // @namespace    http://tampermonkey.net/
-// @version      2.5
-// @description  在 Linux.do 页面显示信任级别进度，支持历史趋势、里程碑通知、阅读时间统计
+// @version      2.6
+// @description  在 Linux.do 和 IDCFlare 页面显示信任级别进度，支持历史趋势、里程碑通知、阅读时间统计
 // @author       JackLiii
 // @match        https://linux.do/*
+// @match        https://idcflare.com/*
 // @grant        GM_xmlhttpRequest
 // @grant        GM_setValue
 // @grant        GM_getValue
@@ -12,6 +13,8 @@
 // @grant        GM_notification
 // @connect      connect.linux.do
 // @connect      linux.do
+// @connect      connect.idcflare.com
+// @connect      idcflare.com
 // @connect      github.com
 // @connect      raw.githubusercontent.com
 // @updateURL    https://raw.githubusercontent.com/caigg188/LDStatusPro/main/LDStatusPro.user.js
@@ -20,6 +23,41 @@
 
 (function() {
     'use strict';
+
+    // ==================== 网站检测 ====================
+    const SITE_CONFIG = {
+        'linux.do': {
+            name: 'Linux.do',
+            icon: '🐧',
+            apiUrl: 'https://connect.linux.do',
+            colorPrimary: '#6366f1',
+            colorSecondary: '#0ea5e9'
+        },
+        'idcflare.com': {
+            name: 'IDCFlare',
+            icon: '⚡',
+            apiUrl: 'https://connect.idcflare.com',
+            colorPrimary: '#f97316',
+            colorSecondary: '#d97706'
+        }
+    };
+
+    // 检测当前网站
+    function detectCurrentSite() {
+        const hostname = window.location.hostname;
+        for (const [domain, config] of Object.entries(SITE_CONFIG)) {
+            if (hostname === domain || hostname.endsWith('.' + domain)) {
+                return { domain, ...config };
+            }
+        }
+        return null;
+    }
+
+    const CURRENT_SITE = detectCurrentSite();
+    if (!CURRENT_SITE) {
+        console.warn('[LDStatus Pro] 不支持的网站，脚本将不运行');
+        return;
+    }
 
     // ==================== 配置 ====================
     const CONFIG = {
@@ -40,6 +78,8 @@
             // 新增：用户数据映射表
             userDataMap: 'ldsp_user_data_map'
         },
+        // 网站特定的存储键前缀
+        SITE_PREFIX: CURRENT_SITE.domain.replace('.', '_'),
         // 需要按用户隔离的存储键
         USER_SPECIFIC_KEYS: [
             'history', 'milestones', 'lastVisit', 'todayData',
@@ -104,10 +144,13 @@
         // 获取用户特定的存储键
         getUserKey(key) {
             const user = this.getCurrentUser();
+            const baseKey = CONFIG.STORAGE_KEYS[key];
+            const sitePrefix = `${CONFIG.SITE_PREFIX}_`;
+            
             if (user && CONFIG.USER_SPECIFIC_KEYS.includes(key)) {
-                return `${CONFIG.STORAGE_KEYS[key]}_${user}`;
+                return `${sitePrefix}${baseKey}_${user}`;
             }
-            return CONFIG.STORAGE_KEYS[key];
+            return `${sitePrefix}${baseKey}`;
         },
 
         // 获取存储值（支持用户隔离）
@@ -735,11 +778,18 @@
             --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.12);
         }
 
+        #ldsp-panel {
+            transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                        height 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                        border-radius 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transform-origin: left center;
+        }
+
         #ldsp-panel.collapsed {
-            width: 44px;
-            height: 44px;
+            width: 44px !important;
+            height: 44px !important;
             border-radius: var(--radius-md);
-            cursor: pointer;
+            cursor: move;
             background: var(--accent-gradient);
             border: none;
         }
@@ -763,6 +813,7 @@
             font-size: 18px;
             background: transparent;
             border-radius: var(--radius-md);
+            cursor: pointer;
         }
 
         #ldsp-panel.collapsed .ldsp-btn-toggle:hover {
@@ -1737,7 +1788,7 @@
             this.el.innerHTML = `
                 <div class="ldsp-header">
                     <div class="ldsp-header-info">
-                        <span class="ldsp-title">📊 LD Pro</span>
+                        <span class="ldsp-title">${CURRENT_SITE.icon} ${CURRENT_SITE.name}</span>
                         <span class="ldsp-version">v${GM_info.script.version}</span>
                     </div>
                     <div class="ldsp-header-btns">
@@ -1814,30 +1865,58 @@
         }
 
         bindEvents() {
-            let dragging = false, ox, oy;
+            let dragging = false, ox, oy, lastX = 0, lastY = 0;
 
-            this.$.header.addEventListener('mousedown', e => {
-                if (this.el.classList.contains('collapsed') || e.target.closest('button')) return;
+            // 根据是否处于最小化状态设置拖动目标
+            const getDragTarget = () => {
+                if (this.el.classList.contains('collapsed')) {
+                    return this.el;  // 最小化状态：整个面板都可拖动
+                } else {
+                    return this.$.header;  // 展开状态：仅header可拖动
+                }
+            };
+
+            const startDrag = (e) => {
+                if (e.target.closest('button')) return;
                 dragging = true;
                 ox = e.clientX - this.el.offsetLeft;
                 oy = e.clientY - this.el.offsetTop;
+                lastX = this.el.offsetLeft;
+                lastY = this.el.offsetTop;
                 this.el.style.transition = 'none';
-            });
+            };
 
-            document.addEventListener('mousemove', e => {
+            const updateDrag = (e) => {
                 if (!dragging) return;
-                const x = Math.max(0, Math.min(e.clientX - ox, innerWidth - this.el.offsetWidth));
-                const y = Math.max(0, Math.min(e.clientY - oy, innerHeight - this.el.offsetHeight));
+                let x = Math.max(0, Math.min(e.clientX - ox, innerWidth - this.el.offsetWidth));
+                let y = Math.max(0, Math.min(e.clientY - oy, innerHeight - this.el.offsetHeight));
                 this.el.style.left = x + 'px';
                 this.el.style.top = y + 'px';
-            });
+            };
 
-            document.addEventListener('mouseup', () => {
+            const endDrag = () => {
                 if (!dragging) return;
                 dragging = false;
                 this.el.style.transition = '';
                 Utils.set('position', { left: this.el.style.left, top: this.el.style.top });
+            };
+
+            // header 可以随时拖动（展开时）
+            this.$.header.addEventListener('mousedown', (e) => {
+                if (!this.el.classList.contains('collapsed')) {
+                    startDrag(e);
+                }
             });
+
+            // 最小化时整个面板可拖动
+            this.el.addEventListener('mousedown', (e) => {
+                if (this.el.classList.contains('collapsed') && !e.target.closest('button')) {
+                    startDrag(e);
+                }
+            });
+
+            document.addEventListener('mousemove', updateDrag);
+            document.addEventListener('mouseup', endDrag);
 
             this.$.btnToggle.addEventListener('click', () => this.toggle());
             this.$.btnRefresh.addEventListener('click', () => this.fetch());
@@ -1853,11 +1932,7 @@
                 });
             });
 
-            this.el.addEventListener('click', e => {
-                if (this.el.classList.contains('collapsed') && !e.target.closest('button')) {
-                    this.toggle();
-                }
-            });
+            // 最小化状态点击直接展开（不需要额外的点击处理）
         }
 
         restore() {
@@ -1875,12 +1950,40 @@
             const theme = Utils.get('theme', 'dark');
             if (theme === 'light') this.el.classList.add('light');
             this.$.btnTheme.textContent = theme === 'dark' ? '🌓' : '☀️';
+            
+            // 初始化展开方向
+            requestAnimationFrame(() => this.optimizeExpandDirection());
         }
 
         toggle() {
-            const collapsed = this.el.classList.toggle('collapsed');
-            this.$.btnToggle.textContent = collapsed ? '▶' : '◀';
-            Utils.set('collapsed', collapsed);
+            const isCollapsing = !this.el.classList.contains('collapsed');
+            
+            if (isCollapsing) {
+                // 即将最小化，改变按钮方向
+                this.$.btnToggle.textContent = '▶';
+            } else {
+                // 即将展开，改变按钮方向
+                this.$.btnToggle.textContent = '◀';
+            }
+            
+            this.el.classList.toggle('collapsed');
+            Utils.set('collapsed', !isCollapsing);
+            
+            // 检测展开/缩小方向：根据面板与视口右边界的距离
+            this.optimizeExpandDirection();
+        }
+
+        optimizeExpandDirection() {
+            const panelRect = this.el.getBoundingClientRect();
+            const distanceToRight = window.innerWidth - panelRect.right;
+            const distanceToLeft = panelRect.left;
+            
+            // 如果面板在右侧接近边界，则向左展开
+            if (distanceToRight < 100 && distanceToLeft > 300) {
+                this.el.style.transformOrigin = 'right center';
+            } else {
+                this.el.style.transformOrigin = 'left center';
+            }
         }
 
         switchTheme() {
@@ -1903,7 +2006,8 @@
         updateAvatar(url) {
             if (url) {
                 if (url.startsWith('/')) {
-                    url = 'https://linux.do' + url;
+                    // 根据当前网站添加域名前缀
+                    url = `https://${CURRENT_SITE.domain}${url}`;
                 }
                 url = url.replace(/\/\d+\//, '/128/');
                 this.userAvatar = url;
@@ -1973,7 +2077,7 @@
 
             GM_xmlhttpRequest({
                 method: 'GET',
-                url: 'https://connect.linux.do',
+                url: CURRENT_SITE.apiUrl,
                 timeout: 15000,
                 onload: res => {
                     if (res.status === 200) this.parse(res.responseText);
