@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         LDStatus Pro
 // @namespace    http://tampermonkey.net/
-// @version      2.8.1
+// @version      2.8.2
 // @description  在 Linux.do 和 IDCFlare 页面显示信任级别进度，支持历史趋势、里程碑通知、阅读时间统计
 // @author       JackLiii
 // @license      MIT
@@ -1905,6 +1905,130 @@
             color: var(--text-muted);
         }
 
+        /* 热力图样式 */
+        .ldsp-heatmap-container {
+            padding: 12px 0;
+        }
+
+        .ldsp-heatmap-label {
+            font-size: 10px;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .ldsp-heatmap {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            margin-bottom: 8px;
+        }
+
+        .ldsp-heatmap-row {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+            font-size: 9px;
+            color: var(--text-muted);
+        }
+
+        .ldsp-heatmap-row-label {
+            width: 30px;
+            text-align: right;
+            font-weight: 500;
+            flex-shrink: 0;
+        }
+
+        .ldsp-heatmap-row-cells {
+            display: flex;
+            gap: 3px;
+            flex: 1;
+        }
+
+        .ldsp-heatmap-cell {
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .ldsp-heatmap-cell:hover {
+            transform: scale(1.15);
+            box-shadow: 0 0 8px rgba(124, 58, 237, 0.4);
+            border-color: var(--accent-primary);
+        }
+
+        .ldsp-heatmap-cell.level-0 {
+            background: rgba(124, 58, 237, 0.1);
+            border-color: rgba(124, 58, 237, 0.2);
+        }
+
+        .ldsp-heatmap-cell.level-1 {
+            background: rgba(124, 58, 237, 0.3);
+            border-color: rgba(124, 58, 237, 0.4);
+        }
+
+        .ldsp-heatmap-cell.level-2 {
+            background: rgba(124, 58, 237, 0.5);
+            border-color: rgba(124, 58, 237, 0.6);
+        }
+
+        .ldsp-heatmap-cell.level-3 {
+            background: rgba(124, 58, 237, 0.7);
+            border-color: rgba(124, 58, 237, 0.8);
+        }
+
+        .ldsp-heatmap-cell.level-4 {
+            background: var(--accent-primary);
+            border-color: var(--accent-primary);
+        }
+
+        .ldsp-heatmap-tooltip {
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--bg-elevated);
+            color: var(--text-primary);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 9px;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+            margin-bottom: 4px;
+            border: 1px solid var(--border-default);
+            z-index: 1000;
+        }
+
+        .ldsp-heatmap-cell:hover .ldsp-heatmap-tooltip {
+            opacity: 1;
+        }
+
+        /* 热力图图例 */
+        .ldsp-heatmap-legend {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            justify-content: center;
+            font-size: 9px;
+            color: var(--text-muted);
+            padding: 8px 0;
+        }
+
+        .ldsp-heatmap-legend-cell {
+            width: 10px;
+            height: 10px;
+            border-radius: 2px;
+            border: 1px solid var(--border-subtle);
+        }
+
         /* 追踪状态指示器 */
         .ldsp-tracking-indicator {
             display: flex;
@@ -3243,7 +3367,7 @@
             return `
                 <div class="ldsp-chart">
                     <div class="ldsp-chart-title">
-                        ⏱️ 本周阅读时间 (柱状图)
+                        ⏱️ 本周阅读时间
                         <span class="ldsp-chart-subtitle">共 ${Utils.formatReadingTime(totalWeekTime)} · 日均 ${Utils.formatReadingTime(avgTime)}</span>
                     </div>
                     <div class="ldsp-reading-week">
@@ -3281,7 +3405,7 @@
             const html = `
                 <div class="ldsp-chart">
                     <div class="ldsp-chart-title">
-                        ⏱️ 本月阅读时间 (按日统计)
+                        ⏱️ 本月阅读时间
                         <span class="ldsp-chart-subtitle">共 ${Utils.formatReadingTime(totalMonthTime)} · 日均 ${Utils.formatReadingTime(avgTime)}</span>
                     </div>
                     <div class="ldsp-month-chart-container">
@@ -3374,145 +3498,137 @@
         }
 
         renderReadingYearChart() {
-            // 获取12个月的数据
+            // 获取365天的数据来构建热力图
             const today = new Date();
-            const months = [];
-            const chartId = 'ldsp-year-chart-' + Date.now();
+            const days = [];
             
-            for (let i = 11; i >= 0; i--) {
-                const monthStart = new Date(today.getFullYear(), today.getMonth() - i, 1);
-                const monthEnd = new Date(today.getFullYear(), today.getMonth() - i + 1, 0);
-                
-                // 计算这个月的总阅读时间
-                let monthTotal = 0;
-                for (let d = monthStart.getDate(); d <= monthEnd.getDate(); d++) {
-                    const date = new Date(monthStart.getFullYear(), monthStart.getMonth(), d);
-                    const dateKey = date.toDateString();
-                    monthTotal += readingTracker.getReadingTimeForDate(dateKey);
-                }
-                
-                months.push({
-                    month: monthStart.getMonth() + 1,
-                    year: monthStart.getFullYear(),
-                    minutes: monthTotal,
-                    label: (monthStart.getMonth() + 1) + '月'
+            // 收集所有日期的阅读时间
+            for (let i = 364; i >= 0; i--) {
+                const date = new Date(today);
+                date.setDate(date.getDate() - i);
+                const dateKey = date.toDateString();
+                const minutes = readingTracker.getReadingTimeForDate(dateKey);
+                days.push({
+                    date: new Date(date),  // 确保是独立的日期对象
+                    dateKey,
+                    minutes: Math.max(minutes, 0),  // 确保非负值
+                    month: date.getMonth(),
+                    dayOfWeek: date.getDay()
                 });
             }
 
-            const maxTime = Math.max(...months.map(m => m.minutes), 60);
+            // 按月份和周组织热力图数据
+            const heatmapByMonth = new Map();
+            days.forEach(d => {
+                const monthKey = d.month;
+                if (!heatmapByMonth.has(monthKey)) {
+                    heatmapByMonth.set(monthKey, []);
+                }
+                heatmapByMonth.get(monthKey).push(d);
+            });
 
-            // 生成折线图的SVG路径
-            const points = months.map((m, i) => {
-                const x = (i / (months.length - 1)) * 100;
-                const y = 100 - (m.minutes / maxTime * 100);
-                return `${x},${y}`;
-            }).join(' ');
-
-            // 生成交互点
-            const circles = months.map((m, i) => {
-                const x = (i / (months.length - 1)) * 100;
-                const y = 100 - (m.minutes / maxTime * 100);
-                const tooltipText = `${m.label}: ${Utils.formatReadingTime(m.minutes)}`;
-                return `<circle cx="${x}" cy="${y}" r="2" class="ldsp-chart-point" data-tooltip="${tooltipText}" data-minutes="${m.minutes}"/>`;
-            }).join('');
-
-            const totalYearTime = months.reduce((sum, m) => sum + m.minutes, 0);
+            const monthNames = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
+            const totalYearTime = days.reduce((sum, d) => sum + d.minutes, 0);
             const avgTime = Math.round(totalYearTime / 12);
+            const maxMinutes = Math.max(...days.map(d => d.minutes), 1);  // 防止除以0
 
-            const html = `
+            let html = `
                 <div class="ldsp-chart">
                     <div class="ldsp-chart-title">
-                        ⏱️ 本年阅读时间 (按月统计)
+                        ⏱️ 本年阅读时间
                         <span class="ldsp-chart-subtitle">共 ${Utils.formatReadingTime(totalYearTime)} · 月均 ${Utils.formatReadingTime(avgTime)}</span>
                     </div>
-                    <div class="ldsp-year-chart-container">
-                        <svg class="ldsp-line-chart ldsp-interactive-chart" id="${chartId}" viewBox="0 0 100 100" preserveAspectRatio="none">
-                            <!-- 网格线 -->
-                            <g class="ldsp-grid">
-                                <line x1="0" y1="25" x2="100" y2="25" class="ldsp-grid-line"/>
-                                <line x1="0" y1="50" x2="100" y2="50" class="ldsp-grid-line"/>
-                                <line x1="0" y1="75" x2="100" y2="75" class="ldsp-grid-line"/>
-                            </g>
-                            <!-- 折线 -->
-                            <polyline points="${points}" fill="none" stroke="var(--accent-primary)" stroke-width="2" class="ldsp-chart-line"/>
-                            <!-- 数据点 -->
-                            ${circles}
-                            <!-- 悬浮指示线 -->
-                            <line class="ldsp-hover-line" x1="50" y1="0" x2="50" y2="100" style="display:none"/>
-                        </svg>
-                        <div class="ldsp-chart-tooltip" id="${chartId}-tooltip" style="display:none;"></div>
-                    </div>
-                    <!-- 月份标签 -->
-                    <div class="ldsp-year-labels">
-                        <span>1月</span>
-                        <span>4月</span>
-                        <span>7月</span>
-                        <span>10月</span>
-                        <span>12月</span>
+                    <div class="ldsp-heatmap-container">
+                        <div class="ldsp-heatmap">
+            `;
+
+            // 周标签
+            const weekLabels = ['日', '一', '二', '三', '四', '五', '六'];
+
+            // 生成热力图
+            for (let monthIdx = 0; monthIdx < 12; monthIdx++) {
+                const monthData = heatmapByMonth.get(monthIdx) || [];
+                
+                if (monthData.length === 0) continue;
+
+                const monthTotal = monthData.reduce((sum, d) => sum + d.minutes, 0);
+                const monthAvg = monthData.length > 0 ? Math.round(monthTotal / monthData.length) : 0;
+
+                html += `
+                            <div class="ldsp-heatmap-row">
+                                <div class="ldsp-heatmap-row-label" title="${monthNames[monthIdx]} 平均: ${Utils.formatReadingTime(monthAvg)}">${monthNames[monthIdx]}</div>
+                                <div class="ldsp-heatmap-row-cells">
+                `;
+
+                // 为每个月的每一天创建热力图单元格
+                // 按照周来排列（最多6行，每行7个格子）
+                const weeksInMonth = {};
+                monthData.forEach(d => {
+                    const week = Math.floor((d.date.getDate() - 1) / 7);
+                    if (!weeksInMonth[week]) {
+                        weeksInMonth[week] = {};
+                    }
+                    weeksInMonth[week][d.dayOfWeek] = d;
+                });
+
+                // 绘制所有周的数据
+                for (let week = 0; week < 6; week++) {
+                    const weekData = weeksInMonth[week] || {};
+                    for (let dayOfWeek = 0; dayOfWeek < 7; dayOfWeek++) {
+                        const dayData = weekData[dayOfWeek];
+                        
+                        if (dayData && dayData.minutes > 0) {
+                            const level = this.getHeatmapLevel(dayData.minutes, maxMinutes);
+                            const dateStr = `${dayData.date.getMonth() + 1}月${dayData.date.getDate()}日`;
+                            html += `
+                                    <div class="ldsp-heatmap-cell level-${level}" title="${dateStr}: ${Utils.formatReadingTime(dayData.minutes)}">
+                                        <div class="ldsp-heatmap-tooltip">${dateStr}<br>${Utils.formatReadingTime(dayData.minutes)}</div>
+                                    </div>
+                            `;
+                        } else {
+                            html += `
+                                    <div class="ldsp-heatmap-cell level-0" title="无数据">
+                                        <div class="ldsp-heatmap-tooltip">无数据</div>
+                                    </div>
+                            `;
+                        }
+                    }
+                }
+
+                html += `
+                                </div>
+                            </div>
+                `;
+            }
+
+            // 添加图例
+            html += `
+                        </div>
+                        <div class="ldsp-heatmap-legend">
+                            <span>少</span>
+                            <div class="ldsp-heatmap-legend-cell" style="background: rgba(124, 58, 237, 0.1);"></div>
+                            <div class="ldsp-heatmap-legend-cell" style="background: rgba(124, 58, 237, 0.3);"></div>
+                            <div class="ldsp-heatmap-legend-cell" style="background: rgba(124, 58, 237, 0.5);"></div>
+                            <div class="ldsp-heatmap-legend-cell" style="background: rgba(124, 58, 237, 0.7);"></div>
+                            <div class="ldsp-heatmap-legend-cell" style="background: var(--accent-primary);"></div>
+                            <span>多</span>
+                        </div>
                     </div>
                 </div>
             `;
 
-            // 延迟绑定事件，确保DOM已加载
-            setTimeout(() => {
-                const chart = document.getElementById(chartId);
-                if (chart) {
-                    this.bindYearChartInteraction(chart, months, maxTime);
-                }
-            }, 100);
-
             return html;
         }
 
-        bindYearChartInteraction(chart, months, maxTime) {
-            const tooltip = chart.nextElementSibling;
-            const hoverLine = chart.querySelector('.ldsp-hover-line');
-            const points = chart.querySelectorAll('.ldsp-chart-point');
-
-            chart.addEventListener('mousemove', (e) => {
-                const rect = chart.getBoundingClientRect();
-                const x = ((e.clientX - rect.left) / rect.width) * 100;
-
-                // 找到最近的数据点
-                let closestIndex = 0;
-                let closestDist = Infinity;
-
-                points.forEach((point, i) => {
-                    const pointX = parseFloat(point.getAttribute('cx'));
-                    const dist = Math.abs(pointX - x);
-                    if (dist < closestDist) {
-                        closestDist = dist;
-                        closestIndex = i;
-                    }
-                });
-
-                const point = points[closestIndex];
-                const pointX = parseFloat(point.getAttribute('cx'));
-                const pointY = parseFloat(point.getAttribute('cy'));
-                const tooltipText = point.getAttribute('data-tooltip');
-
-                // 更新悬浮线
-                hoverLine.setAttribute('x1', pointX);
-                hoverLine.setAttribute('x2', pointX);
-                hoverLine.style.display = 'block';
-
-                // 更新提示
-                if (tooltip) {
-                    tooltip.textContent = tooltipText;
-                    tooltip.style.display = 'block';
-                    tooltip.style.left = (pointX) + '%';
-                }
-
-                // 高亮点
-                points.forEach(p => p.classList.remove('ldsp-chart-point-active'));
-                point.classList.add('ldsp-chart-point-active');
-            });
-
-            chart.addEventListener('mouseleave', () => {
-                hoverLine.style.display = 'none';
-                if (tooltip) tooltip.style.display = 'none';
-                points.forEach(p => p.classList.remove('ldsp-chart-point-active'));
-            });
+        // 计算热力图级别（0-4）
+        getHeatmapLevel(minutes, maxMinutes) {
+            if (minutes === 0 || maxMinutes === 0) return 0;
+            const ratio = minutes / maxMinutes;
+            if (ratio >= 0.8) return 4;
+            if (ratio >= 0.6) return 3;
+            if (ratio >= 0.4) return 2;
+            if (ratio >= 0.2) return 1;
+            return 0;
         }
 
         checkUpdate() {
