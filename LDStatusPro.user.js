@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         LDStatus Pro
 // @namespace    http://tampermonkey.net/
-// @version      2.8.6
+// @version      2.8.7
 // @description  在 Linux.do 和 IDCFlare 页面显示信任级别进度，支持历史趋势、里程碑通知、阅读时间统计
-// @author       JackLiii (Optimized)
+// @author       JackLiii
 // @license      MIT
 // @match        https://linux.do/*
 // @match        https://idcflare.com/*
@@ -99,7 +99,14 @@
             '送出赞': [50, 100, 500, 1000, 2000],
             '回复': [10, 50, 100, 500, 1000]
         },
-        // 优化后的阅读等级区间
+        // 增量统计显示的字段配置
+        TREND_FIELDS: [
+            { key: '浏览话题', searchKey: '浏览的话题', label: '浏览话题' },
+            { key: '已读帖子', searchKey: '已读帖子', label: '已读帖子' },
+            { key: '点赞', searchKey: '送出赞', label: '点赞' },
+            { key: '回复', searchKey: '回复', label: '回复' },
+            { key: '获赞', searchKey: '获赞', label: '获赞' }
+        ],
         READING_LEVELS: [
             { min: 0, label: '刚起步', icon: '🌱', color: '#94a3b8', bg: 'rgba(148, 163, 184, 0.15)' },
             { min: 30, label: '热身中', icon: '📖', color: '#60a5fa', bg: 'rgba(96, 165, 250, 0.15)' },
@@ -109,13 +116,12 @@
             { min: 450, label: 'LD达人', icon: '🏆', color: '#a855f7', bg: 'rgba(168, 85, 247, 0.15)' },
             { min: 600, label: '超级水怪', icon: '👑', color: '#ec4899', bg: 'rgba(236, 72, 153, 0.15)' }
         ],
-        // 热力图颜色区间（分钟）
         HEATMAP_LEVELS: {
-            level0: 1,      // < 1分钟
-            level1: 30,     // 1-30分钟
-            level2: 90,     // 31-90分钟
-            level3: 180,    // 91-180分钟
-            level4: 180     // > 180分钟
+            level0: 1,
+            level1: 30,
+            level2: 90,
+            level3: 180,
+            level4: 180
         }
     };
 
@@ -521,6 +527,7 @@
             return result;
         }
 
+        // 计算每日增量
         aggregateDailyIncrements(history, reqs, maxDays) {
             const cacheKey = `daily_${maxDays}_${history.length}`;
             if (this.cache.has(cacheKey)) {
@@ -565,6 +572,111 @@
             return dayMap;
         }
 
+        // 计算每周增量（用于本月视图）
+        aggregateWeeklyIncrements(history, reqs) {
+            const cacheKey = `weekly_${history.length}`;
+            if (this.cache.has(cacheKey)) {
+                return this.cache.get(cacheKey);
+            }
+
+            const now = new Date();
+            const currentYear = now.getFullYear();
+            const currentMonth = now.getMonth();
+
+            // 获取本月的周列表
+            const weeks = this.getWeeksInMonth(currentYear, currentMonth);
+            const weekMap = new Map();
+
+            // 按周分组历史记录
+            const historyByWeek = new Map();
+            weeks.forEach((week, idx) => {
+                historyByWeek.set(idx, []);
+            });
+
+            history.forEach(h => {
+                const date = new Date(h.ts);
+                if (date.getFullYear() === currentYear && date.getMonth() === currentMonth) {
+                    weeks.forEach((week, idx) => {
+                        if (date >= week.start && date <= week.end) {
+                            historyByWeek.get(idx).push(h);
+                        }
+                    });
+                }
+            });
+
+            // 获取上月最后一条记录作为基准
+            let prevData = null;
+            const lastMonthRecords = history.filter(h => {
+                const date = new Date(h.ts);
+                return date < new Date(currentYear, currentMonth, 1);
+            });
+            if (lastMonthRecords.length > 0) {
+                prevData = { ...lastMonthRecords[lastMonthRecords.length - 1].data };
+            }
+
+            // 计算每周增量
+            weeks.forEach((week, idx) => {
+                const weekRecords = historyByWeek.get(idx);
+                const weekData = {};
+
+                if (weekRecords.length > 0) {
+                    const latestRecord = weekRecords[weekRecords.length - 1];
+                    reqs.forEach(req => {
+                        const currentVal = latestRecord.data[req.name] || 0;
+                        const prevVal = prevData ? (prevData[req.name] || 0) : 0;
+                        weekData[req.name] = currentVal - prevVal;
+                    });
+                    prevData = { ...latestRecord.data };
+                } else {
+                    reqs.forEach(req => {
+                        weekData[req.name] = 0;
+                    });
+                }
+
+                weekMap.set(idx, {
+                    weekNum: idx + 1,
+                    start: week.start,
+                    end: week.end,
+                    label: `第${idx + 1}周`,
+                    data: weekData
+                });
+            });
+
+            this.cache.set(cacheKey, weekMap);
+            return weekMap;
+        }
+
+        // 获取某月的周列表
+        getWeeksInMonth(year, month) {
+            const weeks = [];
+            const firstDay = new Date(year, month, 1);
+            const lastDay = new Date(year, month + 1, 0);
+
+            let weekStart = new Date(firstDay);
+            let weekNum = 1;
+
+            while (weekStart <= lastDay) {
+                let weekEnd = new Date(weekStart);
+                weekEnd.setDate(weekEnd.getDate() + 6);
+
+                if (weekEnd > lastDay) {
+                    weekEnd = new Date(lastDay);
+                }
+
+                weeks.push({
+                    start: new Date(weekStart),
+                    end: weekEnd,
+                    weekNum: weekNum++
+                });
+
+                weekStart = new Date(weekEnd);
+                weekStart.setDate(weekStart.getDate() + 1);
+            }
+
+            return weeks;
+        }
+
+        // 计算每月增量
         aggregateMonthlyIncrements(history, reqs) {
             const cacheKey = `monthly_${history.length}`;
             if (this.cache.has(cacheKey)) {
@@ -627,7 +739,6 @@
             this.saveInterval = null;
             this.initialized = false;
             this.boundListeners = new Map();
-            // 缓存年度数据
             this.yearDataCache = null;
             this.yearDataCacheTime = 0;
         }
@@ -767,7 +878,6 @@
                 this.cleanOldData(stored);
                 this.storage.set('readingTime', stored);
                 this.lastSaveTime = now;
-                // 清除年度缓存
                 this.yearDataCache = null;
             }
         }
@@ -867,10 +977,8 @@
             return result;
         }
 
-        // 获取年度数据（带缓存）
         getYearData() {
             const now = Date.now();
-            // 缓存5秒
             if (this.yearDataCache && (now - this.yearDataCacheTime) < 5000) {
                 return this.yearDataCache;
             }
@@ -880,7 +988,6 @@
             const stored = this.storage.get('readingTime', null);
             const dailyData = stored?.dailyData || {};
 
-            // 预先计算所有日期的数据
             const dateMap = new Map();
             Object.keys(dailyData).forEach(dateKey => {
                 const date = new Date(dateKey);
@@ -889,7 +996,6 @@
                 }
             });
 
-            // 添加今天的实时数据
             const todayKey = this.getTodayKey();
             dateMap.set(todayKey, this.getTodayReadingTime());
 
@@ -996,13 +1102,12 @@
             return levels[0];
         },
 
-        // 获取热力图等级（根据新的区间）
         getHeatmapLevel(minutes) {
-            if (minutes < 1) return 0;           // < 1分钟
-            if (minutes <= 30) return 1;         // 1-30分钟
-            if (minutes <= 90) return 2;         // 31-90分钟
-            if (minutes <= 180) return 3;        // 91-180分钟
-            return 4;                            // > 180分钟
+            if (minutes < 1) return 0;
+            if (minutes <= 30) return 1;
+            if (minutes <= 90) return 2;
+            if (minutes <= 180) return 3;
+            return 4;
         },
 
         reorderRequirements(reqs) {
@@ -1162,13 +1267,32 @@
                 box-shadow: var(--shadow-lg);
                 z-index: 99999;
                 overflow: hidden;
-                transition:
-                    width var(--duration-slow) var(--ease-out-expo),
-                    height var(--duration-slow) var(--ease-out-expo),
-                    border-radius var(--duration-normal) var(--ease-in-out-circ),
-                    opacity var(--duration-normal);
                 border: 1px solid var(--border-subtle);
                 transform-origin: left center;
+            }
+
+            #ldsp-panel,
+            #ldsp-panel *,
+            #ldsp-panel *::before,
+            #ldsp-panel *::after {
+                transition-property: background-color, background, color, border-color, box-shadow, opacity, transform;
+                transition-duration: var(--duration-normal);
+                transition-timing-function: ease-out;
+            }
+
+            #ldsp-panel.no-transition,
+            #ldsp-panel.no-transition *,
+            #ldsp-panel.no-transition *::before,
+            #ldsp-panel.no-transition *::after {
+                transition: none !important;
+            }
+
+            #ldsp-panel.animating {
+                transition: width var(--duration-slow) var(--ease-out-expo),
+                            height var(--duration-slow) var(--ease-out-expo),
+                            border-radius var(--duration-normal) var(--ease-in-out-circ),
+                            left var(--duration-slow) var(--ease-out-expo),
+                            top var(--duration-slow) var(--ease-out-expo);
             }
 
             #ldsp-panel.light {
@@ -1204,6 +1328,9 @@
                 cursor: move;
                 background: var(--accent-gradient);
                 border: none;
+            }
+
+            #ldsp-panel.collapsed.animating {
                 animation: collapse-bounce var(--duration-slow) var(--ease-spring);
             }
 
@@ -1237,6 +1364,14 @@
 
             #ldsp-panel.collapsed .ldsp-btn-toggle:hover {
                 background: rgba(255, 255, 255, 0.1);
+            }
+
+            #ldsp-panel.expand-left {
+                transform-origin: right center;
+            }
+
+            #ldsp-panel.expand-right {
+                transform-origin: left center;
             }
 
             .ldsp-header {
@@ -1295,7 +1430,6 @@
                 border-radius: var(--radius-sm);
                 cursor: pointer;
                 font-size: 12px;
-                transition: all var(--duration-fast);
                 display: flex;
                 align-items: center;
                 justify-content: center;
@@ -1310,6 +1444,17 @@
 
             .ldsp-header-btns button:active {
                 transform: translateY(0);
+            }
+
+            .ldsp-header-btns button:disabled {
+                opacity: 0.6;
+                cursor: not-allowed;
+                transform: none;
+            }
+
+            .ldsp-header-btns button:disabled:hover {
+                background: rgba(255, 255, 255, 0.15);
+                transform: none;
             }
 
             .ldsp-header-btns button::after {
@@ -1358,7 +1503,6 @@
                 border: 2px solid var(--accent-primary);
                 flex-shrink: 0;
                 background: var(--bg-elevated);
-                transition: transform var(--duration-fast), border-color var(--duration-fast);
             }
 
             .ldsp-avatar:hover {
@@ -1423,7 +1567,6 @@
                 padding: 6px 10px;
                 border-radius: var(--radius-md);
                 min-width: 70px;
-                transition: all var(--duration-normal) ease;
                 position: relative;
                 overflow: hidden;
             }
@@ -1436,7 +1579,6 @@
                 right: 0;
                 bottom: 0;
                 opacity: 0.1;
-                transition: opacity var(--duration-fast);
             }
 
             .ldsp-reading-card:hover::before {
@@ -1493,7 +1635,6 @@
                 font-weight: 500;
                 background: var(--bg-card);
                 border-bottom: 1px solid var(--border-subtle);
-                transition: background var(--duration-fast), color var(--duration-fast);
             }
 
             .ldsp-status.success {
@@ -1524,7 +1665,6 @@
                 cursor: pointer;
                 font-size: 11px;
                 font-weight: 600;
-                transition: all var(--duration-fast);
             }
 
             .ldsp-tab:hover {
@@ -1608,13 +1748,22 @@
                 transition: stroke-dashoffset 0.8s var(--ease-out-expo);
             }
 
-            .ldsp-ring-fill.growing {
-                animation: ring-pulse 0.6s ease-out;
+            .ldsp-ring-fill.animate {
+                animation: ring-fill-animation 1.2s var(--ease-out-expo) forwards;
             }
 
-            @keyframes ring-pulse {
-                0%, 100% { filter: brightness(1); }
-                50% { filter: brightness(1.3) drop-shadow(0 0 8px var(--accent-primary)); }
+            @keyframes ring-fill-animation {
+                from {
+                    stroke-dashoffset: var(--ring-circumference);
+                    filter: brightness(1);
+                }
+                50% {
+                    filter: brightness(1.3) drop-shadow(0 0 8px var(--accent-primary));
+                }
+                to {
+                    stroke-dashoffset: var(--ring-target-offset);
+                    filter: brightness(1);
+                }
             }
 
             .ldsp-ring-text {
@@ -1634,6 +1783,22 @@
                 background-clip: text;
             }
 
+            .ldsp-ring-value.animate {
+                animation: ring-value-animation 0.8s var(--ease-out-expo) 0.4s forwards;
+                opacity: 0;
+            }
+
+            @keyframes ring-value-animation {
+                from {
+                    opacity: 0;
+                    transform: scale(0.5);
+                }
+                to {
+                    opacity: 1;
+                    transform: scale(1);
+                }
+            }
+
             .ldsp-ring-label {
                 font-size: 9px;
                 color: var(--text-muted);
@@ -1648,7 +1813,6 @@
                 background: var(--bg-card);
                 border-radius: var(--radius-sm);
                 border-left: 3px solid var(--border-default);
-                transition: all var(--duration-fast);
                 position: relative;
                 overflow: hidden;
                 animation: item-enter var(--duration-normal) var(--ease-out-expo) backwards;
@@ -1681,7 +1845,6 @@
                 width: 3px;
                 background: var(--accent-primary);
                 transform: scaleY(0);
-                transition: transform var(--duration-fast) var(--ease-out-expo);
             }
 
             .ldsp-item:hover {
@@ -1741,7 +1904,6 @@
 
             .ldsp-item-current {
                 color: var(--text-primary);
-                transition: color var(--duration-fast);
             }
 
             .ldsp-item-current.updating {
@@ -1824,7 +1986,6 @@
                 cursor: pointer;
                 font-size: 10px;
                 font-weight: 600;
-                transition: all var(--duration-fast);
                 white-space: nowrap;
                 flex-shrink: 0;
             }
@@ -1904,7 +2065,6 @@
                 border-radius: 2px 2px 0 0;
                 min-height: 2px;
                 opacity: 0.4;
-                transition: all var(--duration-fast);
                 position: relative;
             }
 
@@ -1929,7 +2089,6 @@
                 padding: 2px 3px;
                 border-radius: 2px;
                 opacity: 0;
-                transition: opacity var(--duration-fast);
                 white-space: nowrap;
                 pointer-events: none;
                 box-shadow: var(--shadow-sm);
@@ -2110,7 +2269,6 @@
             .ldsp-reading-progress-fill {
                 height: 100%;
                 border-radius: 3px;
-                transition: width 0.5s var(--ease-out-expo);
             }
 
             .ldsp-reading-week {
@@ -2138,7 +2296,6 @@
                 background: linear-gradient(to top, #7c3aed, #06b6d4);
                 border-radius: 2px 2px 0 0;
                 min-height: 2px;
-                transition: all var(--duration-fast) ease;
                 cursor: pointer;
                 position: relative;
             }
@@ -2163,7 +2320,6 @@
                 white-space: nowrap;
                 opacity: 0;
                 pointer-events: none;
-                transition: opacity var(--duration-fast);
                 box-shadow: var(--shadow-sm);
                 margin-bottom: 3px;
             }
@@ -2222,7 +2378,6 @@
                 font-weight: 600;
             }
 
-            /* 年度热力图容器 - 增加右侧padding防止tooltip被遮挡 */
             .ldsp-year-heatmap-container {
                 padding: 8px 12px 8px 0;
                 overflow-x: hidden;
@@ -2243,6 +2398,7 @@
                 align-items: center;
                 gap: 4px;
                 width: 100%;
+                position: relative;
             }
 
             .ldsp-year-month-label {
@@ -2253,6 +2409,10 @@
                 text-align: right;
                 flex-shrink: 0;
                 line-height: 1;
+                position: absolute;
+                left: 0;
+                top: 50%;
+                transform: translateY(-50%);
             }
 
             .ldsp-year-heatmap-cells {
@@ -2261,6 +2421,7 @@
                 gap: 3px;
                 width: 100%;
                 align-items: center;
+                margin-left: 30px;
             }
 
             .ldsp-year-heatmap-cell {
@@ -2270,7 +2431,6 @@
                 background: var(--bg-card);
                 border: 0.5px solid var(--border-subtle);
                 cursor: pointer;
-                transition: all var(--duration-fast);
                 position: relative;
             }
 
@@ -2298,7 +2458,6 @@
                 box-shadow: none;
             }
 
-            /* tooltip位置调整 - 最右边两列向左显示 */
             .ldsp-year-heatmap-tooltip {
                 position: absolute;
                 left: 50%;
@@ -2311,7 +2470,6 @@
                 white-space: nowrap;
                 opacity: 0;
                 pointer-events: none;
-                transition: opacity var(--duration-fast);
                 border: 1px solid var(--border-default);
                 z-index: 1000;
                 line-height: 1.2;
@@ -2333,7 +2491,6 @@
                 margin-bottom: 0;
             }
 
-            /* 最右边两列的tooltip向左偏移 */
             .ldsp-year-heatmap-cell:nth-child(13) .ldsp-year-heatmap-tooltip,
             .ldsp-year-heatmap-cell:nth-child(14) .ldsp-year-heatmap-tooltip {
                 left: auto;
@@ -2388,7 +2545,6 @@
                 to { transform: rotate(360deg); }
             }
 
-            /* 小型加载器 */
             .ldsp-mini-loader {
                 display: flex;
                 flex-direction: column;
@@ -2426,7 +2582,6 @@
                 font-weight: 600;
                 box-shadow: 0 4px 20px rgba(124, 58, 237, 0.4);
                 opacity: 0;
-                transition: all var(--duration-normal) ease;
                 white-space: nowrap;
                 display: flex;
                 align-items: center;
@@ -2488,6 +2643,7 @@
         constructor(panel) {
             this.panel = panel;
             this.prevValues = new Map();
+            this.lastPct = -1; // 初始化为-1，确保首次渲染时触发动画
         }
 
         renderUser(name, level, isOK, reqs) {
@@ -2506,6 +2662,12 @@
             const ringSize = config.ringSize;
             const ringRadius = (ringSize / 2) - 8;
             const circumference = 2 * Math.PI * ringRadius;
+            const targetOffset = circumference * (1 - pct / 100);
+
+            // 判断是否需要动画：首次渲染、百分比变化、或手动刷新时
+            const shouldAnimate = this.lastPct === -1 || this.lastPct !== pct || this.panel.shouldAnimateRing;
+            this.lastPct = pct;
+            this.panel.shouldAnimateRing = false;
 
             let html = `
                 <div class="ldsp-progress-ring">
@@ -2518,12 +2680,13 @@
                                 </linearGradient>
                             </defs>
                             <circle class="ldsp-ring-bg" cx="${ringSize/2}" cy="${ringSize/2}" r="${ringRadius}"/>
-                            <circle class="ldsp-ring-fill" cx="${ringSize/2}" cy="${ringSize/2}" r="${ringRadius}"
+                            <circle class="ldsp-ring-fill ${shouldAnimate ? 'animate' : ''}" cx="${ringSize/2}" cy="${ringSize/2}" r="${ringRadius}"
                                 stroke-dasharray="${circumference}"
-                                stroke-dashoffset="${circumference * (1 - pct / 100)}"/>
+                                stroke-dashoffset="${shouldAnimate ? circumference : targetOffset}"
+                                style="--ring-circumference: ${circumference}; --ring-target-offset: ${targetOffset};"/>
                         </svg>
                         <div class="ldsp-ring-text">
-                            <div class="ldsp-ring-value">${pct}%</div>
+                            <div class="ldsp-ring-value ${shouldAnimate ? 'animate' : ''}">${pct}%</div>
                             <div class="ldsp-ring-label">完成度</div>
                         </div>
                     </div>
@@ -2614,7 +2777,6 @@
             this.panel.$.trends.innerHTML = html;
         }
 
-        // 渲染加载状态
         renderLoading() {
             return `
                 <div class="ldsp-mini-loader">
@@ -2660,7 +2822,6 @@
                 </div>
             `;
 
-            // 修改目标为10小时（600分钟）
             const maxMinutes = 600;
             const progressPct = Math.min(todayReadingTime / maxMinutes * 100, 100);
 
@@ -2720,6 +2881,14 @@
             return html;
         }
 
+        // 获取趋势数据的字段
+        getTrendFields(reqs) {
+            return CONFIG.TREND_FIELDS.map(field => {
+                const req = reqs.find(r => r.name.includes(field.searchKey));
+                return req ? { ...field, req, name: req.name } : null;
+            }).filter(Boolean);
+        }
+
         renderWeekTrend(history, reqs, historyManager, readingTracker) {
             const now = Date.now();
             const weekAgo = now - 7 * 24 * 3600000;
@@ -2731,21 +2900,18 @@
 
             let html = this.renderReadingWeekChart(readingTracker);
             const dailyAggregates = historyManager.aggregateDailyIncrements(recent, reqs, 7);
-
-            const keys = ['浏览话题', '已读帖子', '获赞', '送出赞', '回复'];
+            const trendFields = this.getTrendFields(reqs);
             const trends = [];
 
-            keys.forEach(key => {
-                const req = reqs.find(r => r.name.includes(key === '浏览话题' ? '浏览的话题' : key));
-                if (!req) return;
-                const trendData = this.calculateDailyTrend(dailyAggregates, req.name, 7);
+            trendFields.forEach(field => {
+                const trendData = this.calculateDailyTrend(dailyAggregates, field.name, 7);
                 if (trendData.values.some(v => v > 0)) {
-                    trends.push({ label: key, ...trendData, current: req.currentValue });
+                    trends.push({ label: field.label, ...trendData, current: field.req.currentValue });
                 }
             });
 
             if (trends.length > 0) {
-                html += `<div class="ldsp-chart"><div class="ldsp-chart-title">📈 本周每日增量<span class="ldsp-chart-subtitle">显示每日新增</span></div>`;
+                html += `<div class="ldsp-chart"><div class="ldsp-chart-title">📈 本周每日增量<span class="ldsp-chart-subtitle">每日累积量</span></div>`;
 
                 trends.forEach(t => {
                     const max = Math.max(...t.values, 1);
@@ -2786,37 +2952,46 @@
             }
 
             let html = this.renderReadingMonthChart(readingTracker);
-            const dailyAggregates = historyManager.aggregateDailyIncrements(recent, reqs, 30);
 
-            const keys = ['浏览话题', '已读帖子', '获赞', '送出赞', '回复'];
+            // 使用每周增量
+            const weeklyAggregates = historyManager.aggregateWeeklyIncrements(recent, reqs);
+            const trendFields = this.getTrendFields(reqs);
             const trends = [];
 
-            keys.forEach(key => {
-                const req = reqs.find(r => r.name.includes(key === '浏览话题' ? '浏览的话题' : key));
-                if (!req) return;
-                const trendData = this.calculateDailyTrend(dailyAggregates, req.name, 30);
-                if (trendData.values.some(v => v > 0)) {
-                    trends.push({ label: key, ...trendData, current: req.currentValue });
+            trendFields.forEach(field => {
+                const trendData = this.calculateWeeklyTrend(weeklyAggregates, field.name);
+                if (trendData.values.length > 0) {
+                    trends.push({ label: field.label, ...trendData, current: field.req.currentValue });
                 }
             });
 
             if (trends.length > 0) {
-                html += `<div class="ldsp-chart"><div class="ldsp-chart-title">📈 本月每日增量<span class="ldsp-chart-subtitle">显示每日新增</span></div>`;
+                html += `<div class="ldsp-chart"><div class="ldsp-chart-title">📈 本月每周增量<span class="ldsp-chart-subtitle">每周累积量</span></div>`;
 
                 trends.forEach(t => {
                     const max = Math.max(...t.values, 1);
-                    const bars = t.values.map((v) => {
-                        const height = Math.max(v / max * 18, 2);
-                        return `<div class="ldsp-spark-bar" style="height:${height}px" data-value="${v}"></div>`;
+                    const bars = t.values.map((v, i) => {
+                        const height = Math.max(v / max * 20, 2);
+                        const isCurrentWeek = i === t.values.length - 1;
+                        const opacity = isCurrentWeek ? '1' : '0.6';
+                        return `<div class="ldsp-spark-bar" style="height:${height}px; opacity:${opacity}" data-value="${v}"></div>`;
                     }).join('');
                     html += `
                         <div class="ldsp-spark-row">
                             <span class="ldsp-spark-label">${t.label}</span>
-                            <div class="ldsp-spark-bars" style="max-width: 100%;">${bars}</div>
+                            <div class="ldsp-spark-bars">${bars}</div>
                             <span class="ldsp-spark-val">${t.current}</span>
                         </div>
                     `;
                 });
+
+                if (trends.length > 0 && trends[0].labels.length > 0) {
+                    html += `<div class="ldsp-date-labels" style="padding-left: 60px;">`;
+                    trends[0].labels.forEach(label => {
+                        html += `<span class="ldsp-date-label">${label}</span>`;
+                    });
+                    html += `</div>`;
+                }
 
                 html += `</div>`;
             }
@@ -2835,21 +3010,18 @@
 
             let html = this.renderReadingYearChart(readingTracker);
             const monthlyAggregates = historyManager.aggregateMonthlyIncrements(recent, reqs);
-
-            const keys = ['浏览话题', '已读帖子', '获赞', '送出赞', '回复'];
+            const trendFields = this.getTrendFields(reqs);
             const trends = [];
 
-            keys.forEach(key => {
-                const req = reqs.find(r => r.name.includes(key === '浏览话题' ? '浏览的话题' : key));
-                if (!req) return;
-                const trendData = this.calculateMonthlyTrend(monthlyAggregates, req.name);
+            trendFields.forEach(field => {
+                const trendData = this.calculateMonthlyTrend(monthlyAggregates, field.name);
                 if (trendData.values.some(v => v > 0)) {
-                    trends.push({ label: key, ...trendData, current: req.currentValue });
+                    trends.push({ label: field.label, ...trendData, current: field.req.currentValue });
                 }
             });
 
             if (trends.length > 0) {
-                html += `<div class="ldsp-chart"><div class="ldsp-chart-title">📊 本年月度增量<span class="ldsp-chart-subtitle">显示每月新增</span></div>`;
+                html += `<div class="ldsp-chart"><div class="ldsp-chart-title">📊 本年每月增量<span class="ldsp-chart-subtitle">每月累积量</span></div>`;
 
                 trends.forEach(t => {
                     const max = Math.max(...t.values, 1);
@@ -3013,25 +3185,21 @@
             `;
         }
 
-        // 优化后的年度热力图渲染（异步分批渲染）
         renderReadingYearChart(readingTracker) {
             const today = new Date();
             const currentYear = today.getFullYear();
 
-            // 使用缓存的年度数据
             const yearData = readingTracker.getYearData();
 
             const jan1 = new Date(currentYear, 0, 1);
             const jan1Weekday = jan1.getDay();
             const leadingBlanks = jan1Weekday === 0 ? 6 : (jan1Weekday - 1);
 
-            // 计算总阅读时间
             let totalYearTime = 0;
             yearData.forEach(minutes => {
                 totalYearTime += minutes;
             });
 
-            // 构建日期数组
             const days = [];
 
             for (let i = 0; i < leadingBlanks; i++) {
@@ -3065,13 +3233,46 @@
                 }
             }
 
-            // 按两周一行组织
             const rows = [];
             for (let i = 0; i < days.length; i += DAYS_PER_ROW) {
                 rows.push(days.slice(i, i + DAYS_PER_ROW));
             }
 
             const monthNames = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
+
+            // 修复：计算每个月份占据的行范围，并在中间行显示标签
+            const monthRowInfo = new Map(); // month -> { startRow, endRow }
+
+            rows.forEach((rowDays, rowIndex) => {
+                rowDays.forEach(d => {
+                    if (!d.isPlaceholder && d.isCurrentYear) {
+                        const month = d.month;
+                        if (!monthRowInfo.has(month)) {
+                            monthRowInfo.set(month, { startRow: rowIndex, endRow: rowIndex });
+                        } else {
+                            const info = monthRowInfo.get(month);
+                            info.endRow = rowIndex;
+                        }
+                    }
+                });
+            });
+
+            // 计算每个月份标签应该显示在哪一行（该月的中间行）
+            const monthLabelRows = new Map(); // rowIndex -> monthName
+            monthRowInfo.forEach((info, month) => {
+                const middleRow = Math.floor((info.startRow + info.endRow) / 2);
+                // 如果该行已经有标签，尝试放到相邻行
+                if (!monthLabelRows.has(middleRow)) {
+                    monthLabelRows.set(middleRow, monthNames[month]);
+                } else {
+                    // 尝试放到下一行或上一行
+                    if (!monthLabelRows.has(middleRow + 1) && middleRow + 1 <= info.endRow) {
+                        monthLabelRows.set(middleRow + 1, monthNames[month]);
+                    } else if (!monthLabelRows.has(middleRow - 1) && middleRow - 1 >= info.startRow) {
+                        monthLabelRows.set(middleRow - 1, monthNames[month]);
+                    }
+                }
+            });
 
             let html = `
                 <div class="ldsp-chart">
@@ -3083,16 +3284,8 @@
                         <div class="ldsp-year-heatmap-wrapper">
             `;
 
-            let lastMonthLabel = -1;
             rows.forEach((rowDays, rowIndex) => {
-                let monthLabel = '';
-                if (rowIndex % 2 === 0 && rowDays.length > 0) {
-                    const firstCurrentYearDay = rowDays.find(d => !d.isPlaceholder && d.isCurrentYear);
-                    if (firstCurrentYearDay && firstCurrentYearDay.month !== lastMonthLabel) {
-                        monthLabel = monthNames[firstCurrentYearDay.month];
-                        lastMonthLabel = firstCurrentYearDay.month;
-                    }
-                }
+                const monthLabel = monthLabelRows.get(rowIndex) || '';
 
                 html += `
                     <div class="ldsp-year-heatmap-month-row">
@@ -3106,7 +3299,6 @@
                         return;
                     }
 
-                    // 使用新的热力图等级计算
                     const level = Utils.getHeatmapLevel(d.minutes);
                     const dateStr = `${d.month + 1}/${d.day}`;
                     const timeStr = Utils.formatReadingTime(d.minutes);
@@ -3155,6 +3347,22 @@
             });
 
             return { values, dates };
+        }
+
+        calculateWeeklyTrend(weeklyAggregates, name) {
+            const values = [];
+            const labels = [];
+
+            const sortedWeeks = Array.from(weeklyAggregates.keys()).sort((a, b) => a - b);
+
+            sortedWeeks.forEach(weekIdx => {
+                const weekData = weeklyAggregates.get(weekIdx);
+                labels.push(weekData.label);
+                const increment = weekData.data[name] || 0;
+                values.push(Math.max(increment, 0));
+            });
+
+            return { values, labels };
         }
 
         calculateMonthlyTrend(monthlyAggregates, name) {
@@ -3210,10 +3418,15 @@
             this.currentUsername = null;
             this.readingUpdateInterval = null;
             this.panelConfig = getPanelConfig();
+            this.shouldAnimateRing = true;
 
-            // 缓存当前数据用于趋势渲染
             this.cachedHistory = [];
             this.cachedReqs = [];
+
+            this.isDragging = false;
+
+            // 修复：添加加载状态标志，防止连点
+            this.isLoading = false;
 
             this.injectStyles();
             this.createPanel();
@@ -3236,26 +3449,20 @@
             this.el.style.setProperty('--panel-padding', `${this.panelConfig.padding}px`);
             this.el.style.setProperty('--avatar-size', `${this.panelConfig.avatarSize}px`);
             this.el.style.setProperty('--ring-size', `${this.panelConfig.ringSize}px`);
-            this.ensurePanelInViewport();
+            this.updateExpandDirection();
         }
 
-        ensurePanelInViewport() {
+        updateExpandDirection() {
             const rect = this.el.getBoundingClientRect();
-            const maxX = window.innerWidth - rect.width - 10;
-            const maxY = window.innerHeight - rect.height - 10;
+            const panelCenter = rect.left + rect.width / 2;
+            const windowCenter = window.innerWidth / 2;
 
-            let newLeft = rect.left;
-            let newTop = rect.top;
+            this.el.classList.remove('expand-left', 'expand-right');
 
-            if (rect.left > maxX) newLeft = Math.max(10, maxX);
-            if (rect.top > maxY) newTop = Math.max(10, maxY);
-            if (rect.left < 10) newLeft = 10;
-            if (rect.top < 10) newTop = 10;
-
-            if (newLeft !== rect.left || newTop !== rect.top) {
-                this.el.style.left = newLeft + 'px';
-                this.el.style.top = newTop + 'px';
-                this.storage.setGlobalImmediate('position', { left: this.el.style.left, top: this.el.style.top });
+            if (panelCenter > windowCenter) {
+                this.el.classList.add('expand-left');
+            } else {
+                this.el.classList.add('expand-right');
             }
         }
 
@@ -3354,21 +3561,23 @@
 
         bindEvents() {
             let dragging = false, ox, oy;
+            let hasMoved = false;
 
             const startDrag = (e) => {
-                if (e.target.closest('button') && !this.el.classList.contains('collapsed')) return;
-                // 最小化状态下，点击toggle按钮不触发拖动
-                if (this.el.classList.contains('collapsed') && e.target.closest('.ldsp-btn-toggle')) return;
+                if (!this.el.classList.contains('collapsed') && e.target.closest('button')) return;
 
                 dragging = true;
+                hasMoved = false;
                 ox = e.clientX - this.el.offsetLeft;
                 oy = e.clientY - this.el.offsetTop;
-                this.el.style.transition = 'none';
+                this.el.classList.add('no-transition');
                 e.preventDefault();
             };
 
             const updateDrag = (e) => {
                 if (!dragging) return;
+                hasMoved = true;
+                // 修复：允许面板贴边，最小值为0而不是10
                 let x = Math.max(0, Math.min(e.clientX - ox, innerWidth - this.el.offsetWidth));
                 let y = Math.max(0, Math.min(e.clientY - oy, innerHeight - this.el.offsetHeight));
                 this.el.style.left = x + 'px';
@@ -3378,19 +3587,17 @@
             const endDrag = () => {
                 if (!dragging) return;
                 dragging = false;
-                this.el.style.transition = '';
-                // 保存位置（无论是展开还是最小化状态）
+                this.el.classList.remove('no-transition');
                 this.storage.setGlobalImmediate('position', { left: this.el.style.left, top: this.el.style.top });
+                this.updateExpandDirection();
             };
 
-            // 展开状态：header可拖动
             this.$.header.addEventListener('mousedown', (e) => {
                 if (!this.el.classList.contains('collapsed')) {
                     startDrag(e);
                 }
             });
 
-            // 最小化状态：整个面板可拖动（除了toggle按钮）
             this.el.addEventListener('mousedown', (e) => {
                 if (this.el.classList.contains('collapsed')) {
                     startDrag(e);
@@ -3402,9 +3609,19 @@
 
             this.$.btnToggle.addEventListener('click', (e) => {
                 e.stopPropagation();
+                if (hasMoved) {
+                    hasMoved = false;
+                    return;
+                }
                 this.toggle();
             });
-            this.$.btnRefresh.addEventListener('click', () => this.fetch());
+
+            // 修复：手动刷新时设置动画标志，并防止连点
+            this.$.btnRefresh.addEventListener('click', () => {
+                if (this.isLoading) return; // 如果正在加载，忽略点击
+                this.shouldAnimateRing = true;
+                this.fetch();
+            });
             this.$.btnTheme.addEventListener('click', () => this.switchTheme());
             this.$.btnUpdate.addEventListener('click', () => this.checkUpdate());
 
@@ -3420,6 +3637,13 @@
                     tab.setAttribute('aria-selected', 'true');
                     tab.setAttribute('tabindex', '0');
                     this.el.querySelector(`#ldsp-${tab.dataset.tab}`).classList.add('active');
+
+                    if (tab.dataset.tab === 'reqs') {
+                        this.shouldAnimateRing = true;
+                        if (this.cachedReqs.length > 0) {
+                            this.renderer.renderReqs(this.cachedReqs);
+                        }
+                    }
                 });
 
                 tab.addEventListener('keydown', (e) => {
@@ -3455,46 +3679,53 @@
             this.$.btnTheme.textContent = theme === 'dark' ? '🌓' : '☀️';
 
             requestAnimationFrame(() => {
-                this.optimizeExpandDirection();
-                this.ensurePanelInViewport();
+                this.updateExpandDirection();
             });
         }
 
         toggle() {
             const isCollapsing = !this.el.classList.contains('collapsed');
+            const rect = this.el.getBoundingClientRect();
+
+            this.el.classList.add('animating');
 
             if (isCollapsing) {
+                if (this.el.classList.contains('expand-left')) {
+                    const newLeft = rect.right - 44;
+                    this.el.style.left = newLeft + 'px';
+                }
+
                 this.$.btnToggle.textContent = '▶';
                 this.$.btnToggle.setAttribute('aria-expanded', 'false');
                 this.$.btnToggle.setAttribute('aria-label', '展开面板');
             } else {
+                this.updateExpandDirection();
+
+                if (this.el.classList.contains('expand-left')) {
+                    const newLeft = rect.left - (this.panelConfig.width - 44);
+                    // 修复：展开时允许贴边，最小值为0
+                    this.el.style.left = Math.max(0, newLeft) + 'px';
+                }
+
                 this.$.btnToggle.textContent = '◀';
                 this.$.btnToggle.setAttribute('aria-expanded', 'true');
                 this.$.btnToggle.setAttribute('aria-label', '折叠面板');
+
+                this.shouldAnimateRing = true;
+                if (this.cachedReqs.length > 0) {
+                    setTimeout(() => {
+                        this.renderer.renderReqs(this.cachedReqs);
+                    }, 100);
+                }
             }
 
             this.el.classList.toggle('collapsed');
             this.storage.setGlobalImmediate('collapsed', isCollapsing);
-            this.optimizeExpandDirection();
 
-            // 展开时确保面板在视口内
-            if (!isCollapsing) {
-                requestAnimationFrame(() => {
-                    this.ensurePanelInViewport();
-                });
-            }
-        }
-
-        optimizeExpandDirection() {
-            const panelRect = this.el.getBoundingClientRect();
-            const distanceToRight = window.innerWidth - panelRect.right;
-            const distanceToLeft = panelRect.left;
-
-            if (distanceToRight < 100 && distanceToLeft > 300) {
-                this.el.style.transformOrigin = 'right center';
-            } else {
-                this.el.style.transformOrigin = 'left center';
-            }
+            setTimeout(() => {
+                this.el.classList.remove('animating');
+                this.storage.setGlobalImmediate('position', { left: this.el.style.left, top: this.el.style.top });
+            }, 400);
         }
 
         switchTheme() {
@@ -3535,7 +3766,24 @@
             }, 1000);
         }
 
+        // 修复：添加加载状态控制
+        setLoadingState(loading) {
+            this.isLoading = loading;
+            if (this.$.btnRefresh) {
+                this.$.btnRefresh.disabled = loading;
+                if (loading) {
+                    this.$.btnRefresh.style.animation = 'ldsp-spin 1s linear infinite';
+                } else {
+                    this.$.btnRefresh.style.animation = '';
+                }
+            }
+        }
+
         async fetch() {
+            // 修复：如果已经在加载中，直接返回
+            if (this.isLoading) return;
+
+            this.setLoadingState(true);
             this.$.reqs.innerHTML = `<div class="ldsp-loading"><div class="ldsp-spinner"></div><div>加载中...</div></div>`;
 
             try {
@@ -3543,6 +3791,8 @@
                 this.parse(html);
             } catch (error) {
                 this.showError(error.message || '网络错误');
+            } finally {
+                this.setLoadingState(false);
             }
         }
 
@@ -3621,7 +3871,6 @@
             this.renderer.renderUser(username, level, isOK, reorderedReqs);
             this.renderer.renderReqs(reorderedReqs);
 
-            // 缓存数据供趋势渲染使用
             this.cachedHistory = history;
             this.cachedReqs = reorderedReqs;
 
@@ -3689,11 +3938,9 @@
         renderTrendContent(history, reqs, currentReadingTime) {
             const container = this.$.trends.querySelector('.ldsp-trend-content');
 
-            // 对于本年标签，先显示加载状态，然后异步渲染
             if (this.currentTrendTab === 'year') {
                 container.innerHTML = this.renderer.renderLoading();
 
-                // 使用 requestAnimationFrame 延迟渲染，让加载动画先显示
                 requestAnimationFrame(() => {
                     setTimeout(() => {
                         container.innerHTML = this.renderer.renderYearTrend(
