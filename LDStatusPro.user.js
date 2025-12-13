@@ -1517,8 +1517,9 @@
 .ldsp-body{background:var(--bg)}
 .ldsp-user{display:flex;align-items:center;gap:10px;padding:var(--pd);background:var(--bg-card);border-bottom:1px solid var(--border)}
 .ldsp-avatar{width:var(--av);height:var(--av);border-radius:50%;border:2px solid var(--accent);flex-shrink:0;background:var(--bg-el)}
-.ldsp-avatar:hover{transform:scale(1.05);border-color:var(--accent2)}
-.ldsp-avatar-ph{width:var(--av);height:var(--av);border-radius:50%;background:var(--grad);display:flex;align-items:center;justify-content:center;font-size:18px;color:#fff;flex-shrink:0}
+.ldsp-avatar:hover{transform:scale(1.1);border-color:var(--accent);box-shadow:0 0 8px var(--accent);cursor:pointer}
+.ldsp-avatar-ph{width:var(--av);height:var(--av);border-radius:50%;background:var(--grad);display:flex;align-items:center;justify-content:center;font-size:18px;color:#fff;flex-shrink:0;cursor:pointer;transition:transform .2s,box-shadow .2s}
+.ldsp-avatar-ph:hover{transform:scale(1.1);box-shadow:0 0 8px var(--accent)}
 .ldsp-user-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
 .ldsp-user-display-name{font-weight:700;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2}
 .ldsp-user-handle{font-size:11px;color:var(--txt-mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -2559,6 +2560,13 @@
 
             this.$.btnTheme.addEventListener('click', () => this._switchTheme());
             this.$.btnUpdate.addEventListener('click', () => this._checkUpdate());
+            
+            // 彩蛋：点击头像打开GitHub仓库
+            this.$.user.addEventListener('click', e => {
+                if (e.target.closest('.ldsp-avatar, .ldsp-avatar-ph')) {
+                    window.open('https://github.com/caigg188/LDStatusPro', '_blank');
+                }
+            });
             
             // 云同步按钮（状态由 CloudSyncManager 的回调自动管理）
             this.$.btnCloudSync?.addEventListener('click', async () => {
