@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         LDStatus Pro
 // @namespace    http://tampermonkey.net/
-// @version      3.0.3
+// @version      3.0.4
 // @description  在 Linux.do 和 IDCFlare 页面显示信任级别进度，支持历史趋势、里程碑通知、阅读时间统计。Linux.do 站点支持排行榜和云同步功能
 // @author       JackLiii
 // @license      MIT
