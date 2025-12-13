@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         LDStatus Pro
 // @namespace    http://tampermonkey.net/
-// @version      3.1.1
+// @version      3.1.2
 // @description  在 Linux.do 和 IDCFlare 页面显示信任级别进度，支持历史趋势、里程碑通知、阅读时间统计。Linux.do 站点支持排行榜和云同步功能
 // @author       JackLiii
 // @license      MIT
@@ -1770,7 +1770,8 @@
 .ldsp-changes{margin-top:6px}
 .ldsp-chg-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border)}
 .ldsp-chg-row:last-child{border-bottom:none}
-.ldsp-chg-name{font-size:10px;color:var(--txt-sec)}
+.ldsp-chg-name{font-size:10px;color:var(--txt-sec);flex:1}
+.ldsp-chg-cur{font-size:10px;color:var(--txt-mut);margin-right:6px}
 .ldsp-chg-val{font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px}
 .ldsp-chg-val.up{background:var(--ok-bg);color:var(--ok)}
 .ldsp-chg-val.down{background:var(--err-bg);color:var(--err)}
@@ -2192,17 +2193,25 @@
         // 渲染全部趋势
         renderAllTrend(history, reqs, tracker) {
             if (history.length < 1) {
-                return `<div class="ldsp-empty"><div class="ldsp-empty-icon">🌐</div><div class="ldsp-empty-txt">数据不足<br>至少需要 2 天数据</div></div>`;
+                return `<div class="ldsp-empty"><div class="ldsp-empty-icon">🌐</div><div class="ldsp-empty-txt">暂无历史数据<br>继续浏览，数据会自动记录</div></div>`;
             }
 
             const oldest = history[0], newest = history.at(-1);
-            const days = Math.ceil((Date.now() - oldest.ts) / 86400000);
+            // 计算记录天数（实际有数据的天数）
+            const recordDays = history.length;
+            // 计算跨度天数（从最早记录到现在的天数）
+            const spanDays = Math.ceil((Date.now() - oldest.ts) / 86400000);
+            
             const total = tracker.getTotalTime();
-            const avg = Math.round(total / Math.max(days, 1));
+            // 使用实际有阅读记录的天数来计算日均
+            const readingData = tracker.storage.get('readingTime', null);
+            const actualReadingDays = readingData?.dailyData ? Object.keys(readingData.dailyData).length : recordDays;
+            const avg = Math.round(total / Math.max(actualReadingDays, 1));
             const lv = Utils.getReadingLevel(avg);
 
-            let html = `<div class="ldsp-time-info">共记录 <span>${days}</span> 天数据</div>`;
+            let html = `<div class="ldsp-time-info">共记录 <span>${recordDays}</span> 天数据${spanDays > recordDays ? ` · 跨度 ${spanDays} 天` : ''}</div>`;
 
+            // 累计阅读时间统计
             if (total > 0) {
                 html += `<div class="ldsp-rd-stats">
                     <div class="ldsp-rd-stats-icon">📚</div>
@@ -2211,15 +2220,37 @@
                 </div>`;
             }
 
+            // 累计变化统计
             const changes = reqs.map(r => ({
                 name: Utils.simplifyName(r.name),
-                diff: (newest.data[r.name] || 0) - (oldest.data[r.name] || 0)
-            })).filter(c => c.diff !== 0);
+                diff: (newest.data[r.name] || 0) - (oldest.data[r.name] || 0),
+                current: r.currentValue,
+                required: r.requiredValue,
+                isSuccess: r.isSuccess
+            })).filter(c => c.diff !== 0 || c.current > 0);
 
             if (changes.length > 0) {
-                html += `<div class="ldsp-chart"><div class="ldsp-chart-title">📊 累计变化</div><div class="ldsp-changes">${
-                    changes.map(c => `<div class="ldsp-chg-row"><span class="ldsp-chg-name">${c.name}</span><span class="ldsp-chg-val ${c.diff > 0 ? 'up' : 'down'}">${c.diff > 0 ? '+' : ''}${c.diff}</span></div>`).join('')
+                html += `<div class="ldsp-chart"><div class="ldsp-chart-title">📊 累计变化 <span style="font-size:9px;color:var(--txt-mut);font-weight:normal">(${recordDays}天)</span></div><div class="ldsp-changes">${
+                    changes.map(c => {
+                        const diffText = c.diff !== 0 ? `<span class="ldsp-chg-val ${c.diff > 0 ? 'up' : 'down'}">${c.diff > 0 ? '+' : ''}${c.diff}</span>` : '';
+                        return `<div class="ldsp-chg-row"><span class="ldsp-chg-name">${c.name}</span><span class="ldsp-chg-cur">${c.current}/${c.required}</span>${diffText}</div>`;
+                    }).join('')
                 }</div></div>`;
+            }
+
+            // 如果有足够的历史数据，显示更多统计
+            if (recordDays >= 2) {
+                // 计算每日平均增量
+                const dailyAvgChanges = reqs.map(r => ({
+                    name: Utils.simplifyName(r.name),
+                    avg: Math.round(((newest.data[r.name] || 0) - (oldest.data[r.name] || 0)) / Math.max(recordDays - 1, 1) * 10) / 10
+                })).filter(c => c.avg > 0);
+
+                if (dailyAvgChanges.length > 0) {
+                    html += `<div class="ldsp-chart"><div class="ldsp-chart-title">📈 日均增量</div><div class="ldsp-changes">${
+                        dailyAvgChanges.map(c => `<div class="ldsp-chg-row"><span class="ldsp-chg-name">${c.name}</span><span class="ldsp-chg-val up">+${c.avg}</span></div>`).join('')
+                    }</div></div>`;
+                }
             }
 
             return html;
