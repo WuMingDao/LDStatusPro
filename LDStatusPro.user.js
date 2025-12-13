@@ -1970,9 +1970,11 @@
 .ldsp-lb-refresh:disabled{opacity:.4;cursor:not-allowed}
 @keyframes ldsp-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 .ldsp-my-rank{display:flex;align-items:center;justify-content:space-between;padding:10px;background:var(--grad);border-radius:var(--r-md);margin-bottom:8px;color:#fff}
+.ldsp-my-rank.not-in-top{background:linear-gradient(135deg,#6b7280 0%,#4b5563 100%)}
 .ldsp-my-rank-lbl{font-size:10px;opacity:.9}
 .ldsp-my-rank-val{font-size:16px;font-weight:800}
 .ldsp-my-rank-time{font-size:11px;opacity:.9}
+.ldsp-not-in-top-hint{font-size:9px;opacity:.7;margin-left:4px}
 .ldsp-join-prompt{background:var(--bg-card);border-radius:var(--r-md);padding:16px;text-align:center;margin-bottom:8px}
 .ldsp-join-prompt-icon{font-size:36px;margin-bottom:8px}
 .ldsp-join-prompt-title{font-size:12px;font-weight:600;margin-bottom:4px}
@@ -2562,7 +2564,11 @@
             let html = `<div class="ldsp-lb-period"><button class="ldsp-lb-refresh" data-type="${type}" title="手动刷新">🔄</button>${data.period ? `📅 统计周期: <span>${data.period}</span>` : ''}<span class="ldsp-update-rule">🔄 ${rules[type]}</span></div>`;
 
             if (data.myRank && isJoined) {
-                html += `<div class="ldsp-my-rank"><div><div class="ldsp-my-rank-lbl">我的排名</div><div class="ldsp-my-rank-val">#${data.myRank.rank}</div></div><div class="ldsp-my-rank-time">${Utils.formatReadingTime(data.myRank.minutes)}</div></div>`;
+                // 显示用户排名（无论是否在榜内都显示真实排名）
+                const rankDisplay = data.myRank.rank ? `#${data.myRank.rank}` : (data.myRank.rank_display || '--');
+                const inTopClass = data.myRank.in_top ? '' : ' not-in-top';
+                const topLabel = data.myRank.in_top ? '' : '<span class="ldsp-not-in-top-hint">（未入榜）</span>';
+                html += `<div class="ldsp-my-rank${inTopClass}"><div><div class="ldsp-my-rank-lbl">我的排名${topLabel}</div><div class="ldsp-my-rank-val">${rankDisplay}</div></div><div class="ldsp-my-rank-time">${Utils.formatReadingTime(data.myRank.minutes)}</div></div>`;
             }
 
             html += '<div class="ldsp-rank-list">';
