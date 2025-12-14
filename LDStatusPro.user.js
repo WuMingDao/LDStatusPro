@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         LDStatus Pro
 // @namespace    http://tampermonkey.net/
-// @version      3.3.1
+// @version      3.3.2
 // @description  在 Linux.do 和 IDCFlare 页面显示信任级别进度，支持历史趋势、里程碑通知、阅读时间统计。两站点均支持排行榜和云同步功能
 // @author       JackLiii
 // @license      MIT
@@ -3933,11 +3933,13 @@
                     return;
                 }
                 
-                // 检查是否已关闭过此公告（基于内容hash）
-                const contentHash = Utils.hash(announcement.content);
-                const dismissedHash = this.storage.getGlobal('dismissedAnnouncement', '');
-                if (dismissedHash === contentHash) {
-                    return;
+                // 检查公告有效期（北京时间）
+                if (announcement.expiresAt) {
+                    const now = Date.now();
+                    if (now > announcement.expiresAt) {
+                        console.log('[Announcement] Expired');
+                        return;
+                    }
                 }
                 
                 // 显示公告
@@ -3971,13 +3973,6 @@
             requestAnimationFrame(() => {
                 this.$.announcement.classList.add('active');
             });
-            
-            // 点击关闭公告
-            this.$.announcement.onclick = () => {
-                const contentHash = Utils.hash(announcement.content);
-                this.storage.setGlobalNow('dismissedAnnouncement', contentHash);
-                this.$.announcement.classList.remove('active');
-            };
         }
 
         async _checkUpdate(autoCheck = false) {
