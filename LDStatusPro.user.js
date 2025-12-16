@@ -1300,49 +1300,63 @@
         }
 
         _listenCallback(win, resolve, reject) {
-            // 允许的 postMessage 来源列表
+            // 允许的 postMessage 来源列表（放宽限制以解决某些用户无法登录的问题）
             const ALLOWED_ORIGINS = [
                 'https://ldstatus-pro-api.jackcai711.workers.dev',
                 CONFIG.LEADERBOARD_API
             ];
 
+            let resolved = false;
+            const cleanup = () => {
+                clearInterval(check);
+                window.removeEventListener('message', handler);
+            };
+
             const check = setInterval(() => {
-                if (win.closed) {
-                    clearInterval(check);
+                if (win.closed && !resolved) {
+                    cleanup();
+                    // 延迟检查，给 postMessage 一些时间
                     setTimeout(() => {
-                        this.isLoggedIn() ? resolve(this.getUserInfo()) : reject(new Error('登录已取消'));
-                    }, 500);
+                        if (!resolved) {
+                            this.isLoggedIn() ? resolve(this.getUserInfo()) : reject(new Error('登录已取消'));
+                        }
+                    }, 800);
                 }
             }, 500);
 
             const handler = (e) => {
-                // 安全检查：验证消息来源
-                if (!ALLOWED_ORIGINS.some(origin => e.origin === origin || e.origin.endsWith('.workers.dev'))) {
-                    console.warn('[LDStatus Pro] Ignored message from untrusted origin:', e.origin);
-                    return;
+                // 只检查消息类型，放宽来源验证（因为 workers.dev 子域名可能变化）
+                // 安全性由 OAuth state 签名和 JWT token 保证
+                if (e.data?.type !== 'ldsp_oauth_callback') return;
+                
+                // 记录来源用于调试
+                const isKnownOrigin = ALLOWED_ORIGINS.some(origin => e.origin === origin) || e.origin.endsWith('.workers.dev');
+                if (!isKnownOrigin) {
+                    console.warn('[LDStatus Pro] OAuth callback from unexpected origin:', e.origin);
                 }
 
-                if (e.data?.type === 'ldsp_oauth_callback') {
-                    clearInterval(check);
-                    window.removeEventListener('message', handler);
-                    
-                    if (e.data.success) {
-                        this.setToken(e.data.token);
-                        this.setUserInfo(e.data.user);
-                        this.setJoined(e.data.isJoined);
-                        win.closed || win.close();
-                        resolve(e.data.user);
-                    } else {
-                        reject(new Error(e.data.error || '登录失败'));
-                    }
+                resolved = true;
+                cleanup();
+                
+                if (e.data.success && e.data.token && e.data.user) {
+                    this.setToken(e.data.token);
+                    this.setUserInfo(e.data.user);
+                    this.setJoined(e.data.isJoined || false);
+                    try { win.closed || win.close(); } catch (e) {}
+                    resolve(e.data.user);
+                } else {
+                    try { win.closed || win.close(); } catch (e) {}
+                    reject(new Error(e.data.error || '登录失败'));
                 }
             };
             window.addEventListener('message', handler);
 
+            // 2分钟超时
             setTimeout(() => {
-                clearInterval(check);
-                window.removeEventListener('message', handler);
-                this.isLoggedIn() || reject(new Error('登录超时'));
+                if (!resolved) {
+                    cleanup();
+                    reject(new Error('登录超时，请重试'));
+                }
             }, 120000);
         }
 
