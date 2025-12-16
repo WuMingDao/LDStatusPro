@@ -1,8 +1,8 @@
-// ==UserScript==
+﻿// ==UserScript==
 // @name         LDStatus Pro
 // @namespace    http://tampermonkey.net/
-// @version      3.3.2
-// @description  在 Linux.do 和 IDCFlare 页面显示信任级别进度，支持历史趋势、里程碑通知、阅读时间统计。两站点均支持排行榜和云同步功能
+// @version      3.4.0
+// @description  在 Linux.do 和 IDCFlare 页面显示信任级别进度，支持历史趋势、里程碑通知、阅读时间统计、排行榜系统。两站点均支持排行榜和云同步功能
 // @author       JackLiii
 // @license      MIT
 // @match        https://linux.do/*
@@ -40,7 +40,7 @@
             name: 'IDCFlare',
             icon: 'https://idcflare.com/uploads/default/optimized/1X/8746f94a48ddc8140e8c7a52084742f38d3f5085_2_180x180.png',
             apiUrl: 'https://connect.idcflare.com',
-            supportsLeaderboard: true  // v3.2.1: 启用排行榜和云同步
+            supportsLeaderboard: true
         }
     };
 
@@ -111,25 +111,28 @@
             { key: '回复', search: '回复', label: '回复' },
             { key: '获赞', search: '获赞', label: '获赞' }
         ],
-        // 阅读等级配置（默认值，实际从服务端动态获取）
-        READING_LEVELS_DEFAULT: [
-            { min: 0, icon: '🌱', label: '刚起步', color: '#94a3b8', bg: 'rgba(148,163,184,0.15)' },
-            { min: 30, icon: '📖', label: '热身中', color: '#60a5fa', bg: 'rgba(96,165,250,0.15)' },
-            { min: 90, icon: '📚', label: '渐入佳境', color: '#34d399', bg: 'rgba(52,211,153,0.15)' },
-            { min: 180, icon: '🔥', label: '沉浸阅读', color: '#fbbf24', bg: 'rgba(251,191,36,0.15)' },
-            { min: 300, icon: '⚡', label: '深度学习', color: '#f97316', bg: 'rgba(249,115,22,0.15)' },
-            { min: 450, icon: '🏆', label: 'LD达人', color: '#a855f7', bg: 'rgba(168,85,247,0.15)' },
-            { min: 600, icon: '👑', label: '超级水怪', color: '#ec4899', bg: 'rgba(236,72,153,0.15)' }
-        ],
-        // 阅读等级预设样式（图标、颜色、背景色固定顺序）
+        // 阅读等级预设样式（图标、颜色、背景色固定，按索引匹配，共10级）
         READING_LEVEL_PRESETS: [
-            { icon: '🌱', color: '#94a3b8', bg: 'rgba(148,163,184,0.15)' },
-            { icon: '📖', color: '#60a5fa', bg: 'rgba(96,165,250,0.15)' },
-            { icon: '📚', color: '#34d399', bg: 'rgba(52,211,153,0.15)' },
-            { icon: '🔥', color: '#fbbf24', bg: 'rgba(251,191,36,0.15)' },
-            { icon: '⚡', color: '#f97316', bg: 'rgba(249,115,22,0.15)' },
-            { icon: '🏆', color: '#a855f7', bg: 'rgba(168,85,247,0.15)' },
-            { icon: '👑', color: '#ec4899', bg: 'rgba(236,72,153,0.15)' }
+            { icon: '🌱', color: '#94a3b8', bg: 'rgba(148,163,184,0.15)' },  // 0: 灰色 - 刚起步
+            { icon: '📖', color: '#60a5fa', bg: 'rgba(96,165,250,0.15)' },  // 1: 蓝色 - 热身中
+            { icon: '📚', color: '#34d399', bg: 'rgba(52,211,153,0.15)' },  // 2: 绿色 - 渐入佳境
+            { icon: '🔥', color: '#fbbf24', bg: 'rgba(251,191,36,0.15)' },  // 3: 黄色 - 沉浸阅读
+            { icon: '⚡', color: '#f97316', bg: 'rgba(249,115,22,0.15)' },  // 4: 橙色 - 深度学习
+            { icon: '🏆', color: '#a855f7', bg: 'rgba(168,85,247,0.15)' },  // 5: 紫色 - LD达人
+            { icon: '👑', color: '#ec4899', bg: 'rgba(236,72,153,0.15)' },  // 6: 粉色 - 超级水怪
+            { icon: '💎', color: '#06b6d4', bg: 'rgba(6,182,212,0.15)' },   // 7: 青色 - 钻石级
+            { icon: '🌟', color: '#eab308', bg: 'rgba(234,179,8,0.15)' },   // 8: 金色 - 传奇级
+            { icon: '🚀', color: '#ef4444', bg: 'rgba(239,68,68,0.15)' }    // 9: 红色 - 神话级
+        ],
+        // 阅读等级默认阈值和标签（与 PRESETS 索引对应）
+        READING_LEVELS_DEFAULT: [
+            { min: 0, label: '刚起步' },
+            { min: 30, label: '热身中' },
+            { min: 90, label: '渐入佳境' },
+            { min: 180, label: '沉浸阅读' },
+            { min: 300, label: '深度学习' },
+            { min: 450, label: 'LD达人' },
+            { min: 600, label: '超级水怪' }
         ],
         // 动态阅读等级配置（运行时从服务器加载）
         READING_LEVELS: null,
@@ -174,6 +177,7 @@
         REVERSE: /被举报|发起举报|禁言|封禁/,
         USERNAME: /\/u\/([^/]+)/,
         TRUST_LEVEL: /(.*) - 信任级别 (\d+)/,
+        TRUST_LEVEL_H1: /你好，.*?\(([^)]+)\)\s*(\d+)级用户/,  // 匹配 h1 中的 "你好，XX (username) X级用户"
         VERSION: /@version\s+([\d.]+)/,
         AVATAR_SIZE: /\/\d+\//,
         NUMBER: /(\d+)/
@@ -205,17 +209,6 @@
                 if (diff !== 0) return diff > 0 ? 1 : -1;
             }
             return 0;
-        },
-
-        // 简单字符串哈希
-        hash(str) {
-            let hash = 0;
-            for (let i = 0; i < str.length; i++) {
-                const char = str.charCodeAt(i);
-                hash = ((hash << 5) - hash) + char;
-                hash = hash & hash; // Convert to 32bit integer
-            }
-            return Math.abs(hash).toString(16);
         },
 
         // 简化名称
@@ -326,16 +319,6 @@
                     setTimeout(() => throttled = false, limit);
                 }
             };
-        },
-
-        // 生成简单哈希
-        simpleHash(str) {
-            let hash = 0;
-            for (let i = 0; i < str.length; i++) {
-                hash = ((hash << 5) - hash) + str.charCodeAt(i);
-                hash |= 0;
-            }
-            return hash.toString(36);
         }
     };
 
@@ -724,6 +707,12 @@
             }
 
             return new Promise((resolve, reject) => {
+                // 确保 body 是字符串
+                let bodyData = options.body;
+                if (bodyData && typeof bodyData === 'object') {
+                    bodyData = JSON.stringify(bodyData);
+                }
+                
                 GM_xmlhttpRequest({
                     method,
                     url: `${CONFIG.LEADERBOARD_API}${endpoint}`,
@@ -732,7 +721,7 @@
                         'X-Client-Version': GM_info.script.version || 'unknown',
                         ...(options.token ? { 'Authorization': `Bearer ${options.token}` } : {})
                     },
-                    data: options.body ? JSON.stringify(options.body) : undefined,
+                    data: bodyData || undefined,
                     timeout: CONFIG.NETWORK.TIMEOUT,
                     onload: res => {
                         try {
@@ -1459,7 +1448,7 @@
                     return;
                 }
                 
-                await this.oauth.api('/api/reading/sync', {
+                const result = await this.oauth.api('/api/reading/sync', {
                     method: 'POST',
                     body: { 
                         date: today,
@@ -1469,8 +1458,38 @@
                 });
                 this._lastSync = Date.now();
                 
-                // 记录已同步的分钟数
-                this.storage?.setGlobal(lastSyncedKey, currentMinutes);
+                // v3.4.1 修复：渐进同步 - 处理服务器截断响应
+                // 服务器防刷机制会限制单次增量，需要多次同步才能完成大幅增量
+                if (result && result.server_minutes !== undefined) {
+                    // 以服务器实际接受的分钟数为准
+                    const serverAccepted = result.server_minutes;
+                    this.storage?.setGlobal(lastSyncedKey, serverAccepted);
+                    
+                    if (result.truncated && serverAccepted < currentMinutes) {
+                        // 服务器截断了数据，需要继续同步
+                        console.log(`[Leaderboard] Sync truncated: server=${serverAccepted}, client=${currentMinutes}, will retry`);
+                        // 35秒后再次尝试同步剩余数据（服务器限制是30秒）
+                        setTimeout(() => {
+                            this._lastSync = 0; // 重置冷却时间
+                            this.syncReadingTime();
+                        }, 35000);
+                    } else if (result.rateLimited) {
+                        // 被服务器限速，稍后重试
+                        console.log(`[Leaderboard] Rate limited, will retry later`);
+                        setTimeout(() => {
+                            this._lastSync = 0;
+                            this.syncReadingTime();
+                        }, 35000);
+                    } else if (result.override) {
+                        // 服务器数据更大，更新本地记录
+                        console.log(`[Leaderboard] Server override: server=${serverAccepted}`);
+                    } else {
+                        console.log(`[Leaderboard] Sync success: ${serverAccepted} min`);
+                    }
+                } else {
+                    // 兼容旧版响应格式
+                    this.storage?.setGlobal(lastSyncedKey, currentMinutes);
+                }
             } catch (e) {
                 console.warn('[Leaderboard] Sync failed:', e.message || e);
             }
@@ -2212,17 +2231,25 @@
 
         _css(c) {
             return `
-#ldsp-panel{--dur-fast:120ms;--dur:200ms;--dur-slow:350ms;--ease:cubic-bezier(.22,1,.36,1);--ease-circ:cubic-bezier(.85,0,.15,1);--ease-spring:cubic-bezier(.175,.885,.32,1.275);--ease-out:cubic-bezier(0,.55,.45,1);--bg:#0c0c14;--bg-card:rgba(22,22,35,.85);--bg-hover:rgba(40,40,65,.9);--bg-el:rgba(30,30,50,.8);--bg-glass:rgba(255,255,255,.03);--txt:#f0f0f5;--txt-sec:#a8a8bc;--txt-mut:#6b6b80;--accent:#8b5cf6;--accent-light:#a78bfa;--accent2:#22d3ee;--accent2-light:#67e8f9;--accent3:#f472b6;--grad:linear-gradient(135deg,#8b5cf6 0%,#06b6d4 50%,#22d3ee 100%);--grad-accent:linear-gradient(135deg,#8b5cf6,#7c3aed);--grad-warm:linear-gradient(135deg,#f472b6,#ec4899);--grad-gold:linear-gradient(135deg,#fbbf24 0%,#f59e0b 100%);--ok:#10b981;--ok-light:#34d399;--ok-bg:rgba(16,185,129,.12);--err:#f43f5e;--err-light:#fb7185;--err-bg:rgba(244,63,94,.12);--warn:#f59e0b;--warn-bg:rgba(245,158,11,.12);--border:rgba(255,255,255,.04);--border2:rgba(255,255,255,.08);--border-accent:rgba(139,92,246,.3);--shadow:0 20px 60px rgba(0,0,0,.5),0 0 0 1px rgba(255,255,255,.05);--shadow-lg:0 25px 80px rgba(0,0,0,.6),0 0 40px rgba(139,92,246,.1);--shadow-glow:0 0 30px rgba(139,92,246,.2);--glow-accent:0 0 20px rgba(139,92,246,.3);--r-xs:4px;--r-sm:8px;--r-md:12px;--r-lg:16px;--r-xl:20px;--w:${c.width}px;--h:${c.maxHeight}px;--fs:${c.fontSize}px;--pd:${c.padding}px;--av:${c.avatarSize}px;--ring:${c.ringSize}px;position:fixed;right:12px;top:80px;left:auto;width:var(--w);background:var(--bg);border-radius:var(--r-lg);font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Noto Sans SC',sans-serif;font-size:var(--fs);color:var(--txt);box-shadow:var(--shadow);z-index:99999;overflow:hidden;border:1px solid var(--border);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
-#ldsp-panel,#ldsp-panel *{transition:background-color var(--dur) var(--ease),color var(--dur),border-color var(--dur),opacity var(--dur),transform var(--dur) var(--ease),box-shadow var(--dur)}
+#ldsp-panel{--dur-fast:120ms;--dur:200ms;--dur-slow:350ms;--ease:cubic-bezier(.22,1,.36,1);--ease-circ:cubic-bezier(.85,0,.15,1);--ease-spring:cubic-bezier(.175,.885,.32,1.275);--ease-out:cubic-bezier(0,.55,.45,1);--bg:#12131a;--bg-card:rgba(24,26,36,.92);--bg-hover:rgba(38,42,56,.95);--bg-el:rgba(32,35,48,.88);--bg-glass:rgba(255,255,255,.02);--txt:#e4e6ed;--txt-sec:#9499ad;--txt-mut:#5d6275;--accent:#6b8cef;--accent-light:#8aa4f4;--accent2:#5bb5a6;--accent2-light:#7cc9bc;--accent3:#e07a8d;--grad:linear-gradient(135deg,#5a7de0 0%,#4a6bc9 100%);--grad-accent:linear-gradient(135deg,#4a6bc9,#3d5aaa);--grad-warm:linear-gradient(135deg,#e07a8d,#c9606e);--grad-gold:linear-gradient(135deg,#d4a853 0%,#c49339 100%);--ok:#5bb5a6;--ok-light:#7cc9bc;--ok-bg:rgba(91,181,166,.12);--err:#e07a8d;--err-light:#ea9aa8;--err-bg:rgba(224,122,141,.12);--warn:#d4a853;--warn-bg:rgba(212,168,83,.12);--border:rgba(255,255,255,.06);--border2:rgba(255,255,255,.1);--border-accent:rgba(107,140,239,.3);--shadow:0 20px 50px rgba(0,0,0,.4),0 0 0 1px rgba(255,255,255,.04);--shadow-lg:0 25px 70px rgba(0,0,0,.5),0 0 30px rgba(107,140,239,.06);--shadow-glow:0 0 20px rgba(107,140,239,.15);--glow-accent:0 0 15px rgba(107,140,239,.2);--r-xs:4px;--r-sm:8px;--r-md:12px;--r-lg:16px;--r-xl:20px;--w:${c.width}px;--h:${c.maxHeight}px;--fs:${c.fontSize}px;--pd:${c.padding}px;--av:${c.avatarSize}px;--ring:${c.ringSize}px;position:fixed;right:12px;top:80px;left:auto;width:var(--w);background:var(--bg);border-radius:var(--r-lg);font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Noto Sans SC',sans-serif;font-size:var(--fs);color:var(--txt);box-shadow:var(--shadow);z-index:99999;overflow:hidden;border:1px solid var(--border);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
+#ldsp-panel,#ldsp-panel *{transition:background-color var(--dur) var(--ease),color var(--dur),border-color var(--dur),opacity var(--dur),transform var(--dur) var(--ease),box-shadow var(--dur);user-select:none}
+#ldsp-panel input,#ldsp-panel textarea{cursor:text;user-select:text}
+#ldsp-panel [data-clickable],#ldsp-panel [data-clickable] *,#ldsp-panel button,#ldsp-panel a,#ldsp-panel .ldsp-tab,#ldsp-panel .ldsp-subtab,#ldsp-panel .ldsp-ring-lvl,#ldsp-panel .ldsp-rd-day-bar,#ldsp-panel .ldsp-year-cell:not(.empty),#ldsp-panel .ldsp-rank-item,#ldsp-panel .ldsp-ticket-item,#ldsp-panel .ldsp-ticket-type,#ldsp-panel .ldsp-ticket-tab,#ldsp-panel .ldsp-ticket-close,#ldsp-panel .ldsp-ticket-back,#ldsp-panel .ldsp-lb-refresh,#ldsp-panel .ldsp-modal-btn,#ldsp-panel .ldsp-lb-btn,#ldsp-panel .ldsp-site-icon,#ldsp-panel .ldsp-update-bubble-close{cursor:pointer}
 #ldsp-panel.no-trans,#ldsp-panel.no-trans *{transition:none!important}
 #ldsp-panel.anim{transition:width var(--dur-slow) var(--ease),height var(--dur-slow) var(--ease),left var(--dur-slow) var(--ease),top var(--dur-slow) var(--ease)}
-#ldsp-panel.light{--bg:rgba(255,255,255,.95);--bg-card:rgba(248,250,252,.9);--bg-hover:rgba(241,245,249,.95);--bg-el:rgba(255,255,255,.9);--bg-glass:rgba(0,0,0,.02);--txt:#0f172a;--txt-sec:#475569;--txt-mut:#94a3b8;--accent:#7c3aed;--accent-light:#8b5cf6;--accent2:#0891b2;--accent2-light:#06b6d4;--ok:#059669;--ok-light:#10b981;--ok-bg:rgba(5,150,105,.08);--err:#dc2626;--err-light:#ef4444;--err-bg:rgba(220,38,38,.08);--warn:#d97706;--warn-bg:rgba(217,119,6,.08);--border:rgba(0,0,0,.05);--border2:rgba(0,0,0,.08);--border-accent:rgba(124,58,237,.2);--shadow:0 20px 60px rgba(0,0,0,.1),0 0 0 1px rgba(0,0,0,.05);--shadow-lg:0 25px 80px rgba(0,0,0,.15);--glow-accent:0 0 20px rgba(124,58,237,.15)}
-#ldsp-panel.collapsed{width:48px!important;height:48px!important;border-radius:var(--r-md);cursor:move;touch-action:none;background:var(--grad);border:none;box-shadow:var(--shadow),var(--glow-accent)}
+#ldsp-panel.light{--bg:rgba(250,251,254,.97);--bg-card:rgba(245,247,252,.94);--bg-hover:rgba(238,242,250,.96);--bg-el:rgba(255,255,255,.94);--bg-glass:rgba(0,0,0,.012);--txt:#1e2030;--txt-sec:#4a5068;--txt-mut:#8590a6;--accent:#5070d0;--accent-light:#6b8cef;--accent2:#4a9e8f;--accent2-light:#5bb5a6;--ok:#4a9e8f;--ok-light:#5bb5a6;--ok-bg:rgba(74,158,143,.08);--err:#d45d6e;--err-light:#e07a8d;--err-bg:rgba(212,93,110,.08);--warn:#c49339;--warn-bg:rgba(196,147,57,.08);--border:rgba(0,0,0,.05);--border2:rgba(0,0,0,.08);--border-accent:rgba(80,112,208,.2);--shadow:0 20px 50px rgba(0,0,0,.07),0 0 0 1px rgba(0,0,0,.04);--shadow-lg:0 25px 70px rgba(0,0,0,.1);--glow-accent:0 0 15px rgba(80,112,208,.1)}
+#ldsp-panel.collapsed{width:48px!important;height:48px!important;border-radius:var(--r-md);cursor:pointer;touch-action:none;background:linear-gradient(135deg,#7a9bf5 0%,#5a7de0 50%,#5bb5a6 100%);border:none;box-shadow:var(--shadow),0 0 20px rgba(107,140,239,.35)}
 #ldsp-panel.collapsed .ldsp-hdr{padding:0;justify-content:center;align-items:center;height:100%;background:0 0}
 #ldsp-panel.collapsed .ldsp-hdr-info,#ldsp-panel.collapsed .ldsp-hdr-btns>button:not(.ldsp-toggle),#ldsp-panel.collapsed .ldsp-body{display:none!important}
 #ldsp-panel.collapsed .ldsp-hdr-btns{justify-content:center;width:100%;height:100%}
+#ldsp-panel.collapsed,#ldsp-panel.collapsed *{cursor:pointer!important}
 #ldsp-panel.collapsed .ldsp-toggle{width:100%;height:100%;font-size:18px;background:0 0;display:flex;align-items:center;justify-content:center;color:#fff;position:absolute;inset:0}
-#ldsp-panel.collapsed:hover{transform:scale(1.05);box-shadow:var(--shadow-lg),var(--glow-accent)}
+#ldsp-panel.collapsed .ldsp-toggle .ldsp-toggle-arrow{display:none}
+#ldsp-panel.collapsed .ldsp-toggle .ldsp-toggle-logo{display:block;width:24px;height:24px;filter:brightness(1.05) drop-shadow(0 0 2px rgba(140,180,255,.2));transition:filter .2s var(--ease),transform .2s var(--ease)}
+#ldsp-panel:not(.collapsed) .ldsp-toggle .ldsp-toggle-logo{display:none}
+#ldsp-panel.collapsed:hover{transform:scale(1.08);box-shadow:var(--shadow-lg),0 0 35px rgba(120,160,255,.6)}
+#ldsp-panel.collapsed:hover .ldsp-toggle-logo{filter:brightness(1.6) drop-shadow(0 0 12px rgba(160,200,255,1)) drop-shadow(0 0 20px rgba(140,180,255,.8));transform:scale(1.15) rotate(360deg);transition:filter .3s var(--ease),transform .6s var(--ease-spring)}
+#ldsp-panel.collapsed:active .ldsp-toggle-logo{filter:brightness(2) drop-shadow(0 0 16px rgba(200,230,255,1)) drop-shadow(0 0 30px rgba(160,200,255,1));transform:scale(0.92)}
 .ldsp-hdr{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--grad);cursor:move;user-select:none;touch-action:none;position:relative;overflow:hidden}
 .ldsp-hdr::before{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.1) 0%,transparent 100%);pointer-events:none}
 .ldsp-hdr::after{content:'';position:absolute;top:-50%;left:-50%;width:200%;height:200%;background:radial-gradient(circle,rgba(255,255,255,.1) 0%,transparent 60%);opacity:0;transition:opacity .5s;pointer-events:none}
@@ -2234,12 +2261,12 @@
 .ldsp-hdr-text{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:0;flex:1;overflow:hidden}
 .ldsp-title{font-weight:800;font-size:15px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2;letter-spacing:-.02em;text-shadow:0 1px 2px rgba(0,0,0,.2)}
 .ldsp-ver{font-size:11px;color:rgba(255,255,255,.6);line-height:1.3;display:flex;flex-wrap:wrap;align-items:center;gap:3px 6px}
-.ldsp-app-name{font-size:12px;font-weight:700;background:linear-gradient(90deg,#fff 0%,#a78bfa 50%,#22d3ee 100%);background-size:100% 100%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:color-pulse 2.5s ease-in-out infinite}
-@keyframes color-pulse{0%,100%{filter:brightness(1);opacity:.85}50%{filter:brightness(1.4);opacity:1}}
+.ldsp-app-name{font-size:12px;font-weight:700;background:linear-gradient(90deg,#a8c0f8,#7a9eef,#7cc9bc,#7a9eef,#a8c0f8);background-size:200% auto;-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:gradient-shift 4s ease infinite}
+@keyframes gradient-shift{0%{background-position:0% center}50%{background-position:100% center}100%{background-position:0% center}}
 .ldsp-ver-num{background:rgba(255,255,255,.2);padding:2px 8px;border-radius:10px;color:#fff;font-weight:600;font-size:9px;backdrop-filter:blur(4px)}
 .ldsp-site-ver{font-size:10px;color:#fff;text-align:center;font-weight:700;background:rgba(0,0,0,.25);padding:2px 7px;border-radius:6px;letter-spacing:.02em}
 .ldsp-hdr-btns{display:flex;gap:6px;flex-shrink:0;position:relative;z-index:1}
-.ldsp-hdr-btns button{width:30px;height:30px;border:none;background:rgba(255,255,255,.12);color:#fff;border-radius:var(--r-sm);cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0;outline:none;-webkit-tap-highlight-color:transparent;backdrop-filter:blur(4px);transition:all .2s var(--ease)}
+.ldsp-hdr-btns button{width:30px;height:30px;border:none;background:rgba(255,255,255,.12);color:#fff;border-radius:var(--r-sm);font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0;outline:none;-webkit-tap-highlight-color:transparent;backdrop-filter:blur(4px);transition:all .2s var(--ease)}
 .ldsp-hdr-btns button:hover{background:rgba(255,255,255,.25);transform:translateY(-2px) scale(1.05);box-shadow:0 4px 12px rgba(0,0,0,.2)}
 .ldsp-hdr-btns button:active{transform:translateY(0) scale(.95)}
 .ldsp-hdr-btns button:focus{outline:none}
@@ -2251,55 +2278,59 @@
 .ldsp-update-bubble{position:absolute;top:52px;left:50%;transform:translateX(-50%) translateY(-10px);background:var(--bg-card);border:1px solid var(--border-accent);border-radius:var(--r-md);padding:16px 18px;text-align:center;z-index:100;box-shadow:var(--shadow-lg),var(--glow-accent);opacity:0;pointer-events:none;transition:all .3s var(--ease-spring);max-width:calc(100% - 24px);width:220px;backdrop-filter:blur(16px)}
 .ldsp-update-bubble::before{content:'';position:absolute;top:-7px;left:50%;transform:translateX(-50%) rotate(45deg);width:12px;height:12px;background:var(--bg-card);border-left:1px solid var(--border-accent);border-top:1px solid var(--border-accent)}
 .ldsp-update-bubble.show{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:auto}
-.ldsp-update-bubble-close{position:absolute;top:8px;right:10px;font-size:16px;cursor:pointer;color:var(--txt-mut);transition:all .2s;line-height:1;width:20px;height:20px;display:flex;align-items:center;justify-content:center;border-radius:50%}
+.ldsp-update-bubble-close{position:absolute;top:8px;right:10px;font-size:16px;color:var(--txt-mut);transition:all .2s;line-height:1;width:20px;height:20px;display:flex;align-items:center;justify-content:center;border-radius:50%}
 .ldsp-update-bubble-close:hover{color:var(--txt);background:var(--bg-hover)}
 .ldsp-update-bubble-icon{font-size:28px;margin-bottom:8px;animation:bounce-in .5s var(--ease-spring)}
 @keyframes bounce-in{0%{transform:scale(0)}50%{transform:scale(1.2)}100%{transform:scale(1)}}
 .ldsp-update-bubble-title{font-size:13px;font-weight:700;margin-bottom:6px;color:var(--txt);letter-spacing:-.01em}
 .ldsp-update-bubble-ver{font-size:11px;margin-bottom:12px;color:var(--txt-sec)}
-.ldsp-update-bubble-btn{background:var(--grad);color:#fff;border:none;padding:8px 20px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s var(--ease);box-shadow:0 4px 15px rgba(139,92,246,.3)}
-.ldsp-update-bubble-btn:hover{transform:translateY(-2px) scale(1.02);box-shadow:0 6px 20px rgba(139,92,246,.4)}
+.ldsp-update-bubble-btn{background:var(--grad);color:#fff;border:none;padding:8px 20px;border-radius:20px;font-size:12px;font-weight:600;transition:all .2s var(--ease);box-shadow:0 4px 15px rgba(107,140,239,.3)}
+.ldsp-update-bubble-btn:hover{transform:translateY(-2px) scale(1.02);box-shadow:0 6px 20px rgba(107,140,239,.4)}
 .ldsp-update-bubble-btn:active{transform:translateY(0) scale(.98)}
 .ldsp-update-bubble-btn:disabled{opacity:.6;cursor:not-allowed;transform:none!important}
-.ldsp-body{background:var(--bg)}
-.ldsp-announcement{overflow:hidden;background:linear-gradient(90deg,rgba(59,130,246,.1),rgba(139,92,246,.1));border-bottom:1px solid var(--border);padding:0;height:0;opacity:0;transition:all .3s var(--ease)}
+.ldsp-body{background:var(--bg);position:relative;overflow:hidden}
+.ldsp-announcement{overflow:hidden;background:linear-gradient(90deg,rgba(59,130,246,.1),rgba(107,140,239,.1));border-bottom:1px solid var(--border);padding:0;height:0;opacity:0;transition:all .3s var(--ease)}
 .ldsp-announcement.active{height:24px;opacity:1;padding:0 10px}
 .ldsp-announcement.warning{background:linear-gradient(90deg,rgba(245,158,11,.15),rgba(239,68,68,.08))}
 .ldsp-announcement.success{background:linear-gradient(90deg,rgba(16,185,129,.12),rgba(34,197,94,.08))}
-.ldsp-announcement-inner{display:flex;align-items:center;height:24px;white-space:nowrap;animation:marquee var(--marquee-duration,20s) linear infinite}
+.ldsp-announcement-inner{display:flex;align-items:center;height:24px;white-space:nowrap;animation:marquee var(--marquee-duration,20s) linear forwards}
 .ldsp-announcement-inner:hover{animation-play-state:paused}
 .ldsp-announcement-text{font-size:11px;font-weight:500;color:var(--txt-sec);display:flex;align-items:center;gap:6px;padding-right:50px}
 .ldsp-announcement-text::before{content:'📢';font-size:12px}
 .ldsp-announcement.warning .ldsp-announcement-text::before{content:'⚠️'}
 .ldsp-announcement.success .ldsp-announcement-text::before{content:'🎉'}
 @keyframes marquee{0%{transform:translateX(100%)}100%{transform:translateX(-100%)}}
-.ldsp-user{display:flex;align-items:center;gap:12px;padding:8px var(--pd);background:var(--bg-card);border-bottom:1px solid var(--border);position:relative;overflow:hidden}
+.ldsp-user{display:flex;align-items:stretch;gap:10px;padding:10px var(--pd) 22px;background:var(--bg-card);border-bottom:1px solid var(--border);position:relative;overflow:visible}
 .ldsp-user::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--accent),transparent);opacity:.3}
-.ldsp-avatar{width:var(--av);height:var(--av);border-radius:12px;border:2px solid var(--accent);flex-shrink:0;background:var(--bg-el);position:relative;box-shadow:0 4px 12px rgba(139,92,246,.2);transition:all .3s var(--ease)}
-.ldsp-avatar:hover{transform:scale(1.08) rotate(-3deg);border-color:var(--accent-light);box-shadow:0 6px 20px rgba(139,92,246,.35),var(--glow-accent);cursor:pointer}
-.ldsp-avatar-ph{width:var(--av);height:var(--av);border-radius:12px;background:var(--grad);display:flex;align-items:center;justify-content:center;font-size:18px;color:#fff;flex-shrink:0;cursor:pointer;transition:all .3s var(--ease);position:relative;box-shadow:0 4px 12px rgba(139,92,246,.25)}
-.ldsp-avatar-ph:hover{transform:scale(1.08) rotate(-3deg);box-shadow:0 6px 20px rgba(139,92,246,.4)}
+.ldsp-user-left{display:flex;flex-direction:column;flex:1;min-width:0;gap:8px}
+.ldsp-user-row{display:flex;align-items:center;gap:10px}
+.ldsp-user-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:2px}
+.ldsp-avatar{width:var(--av);height:var(--av);border-radius:12px;border:2px solid var(--accent);flex-shrink:0;background:var(--bg-el);position:relative;box-shadow:0 4px 12px rgba(107,140,239,.2);transition:all .3s var(--ease)}
+.ldsp-avatar:hover{transform:scale(1.08) rotate(-3deg);border-color:var(--accent-light);box-shadow:0 6px 20px rgba(107,140,239,.35),var(--glow-accent)}
+.ldsp-avatar-ph{width:var(--av);height:var(--av);border-radius:12px;background:var(--grad);display:flex;align-items:center;justify-content:center;font-size:18px;color:#fff;flex-shrink:0;transition:all .3s var(--ease);position:relative;box-shadow:0 4px 12px rgba(107,140,239,.25)}
+.ldsp-avatar-ph:hover{transform:scale(1.08) rotate(-3deg);box-shadow:0 6px 20px rgba(107,140,239,.4)}
 .ldsp-avatar-wrap{position:relative;flex-shrink:0}
 .ldsp-avatar-wrap::after{content:'🔗 GitHub';position:absolute;bottom:-20px;left:50%;transform:translateX(-50%) translateY(4px);background:var(--bg-el);color:var(--txt-sec);padding:3px 8px;border-radius:6px;font-size:8px;white-space:nowrap;opacity:0;pointer-events:none;transition:all .2s var(--ease);border:1px solid var(--border2);box-shadow:0 4px 12px rgba(0,0,0,.2)}
 .ldsp-avatar-wrap:hover::after{opacity:1;transform:translateX(-50%) translateY(0)}
 .ldsp-user-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
 .ldsp-user-display-name{font-weight:700;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3;letter-spacing:-.01em;background:linear-gradient(135deg,var(--txt) 0%,var(--txt-sec) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
 .ldsp-user-handle{font-size:12px;color:var(--txt-mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500}
-.ldsp-user.not-logged .ldsp-avatar,.ldsp-user.not-logged .ldsp-avatar-ph{border:2px dashed var(--warn);cursor:pointer;animation:pulse-border 2s ease infinite}
+.ldsp-user.not-logged .ldsp-avatar,.ldsp-user.not-logged .ldsp-avatar-ph{border:2px dashed var(--warn);animation:pulse-border 2s ease infinite}
 @keyframes pulse-border{0%,100%{border-color:var(--warn)}50%{border-color:rgba(245,158,11,.4)}}
-.ldsp-user.not-logged .ldsp-user-display-name{color:var(--warn);-webkit-text-fill-color:var(--warn);cursor:pointer}
+@keyframes pulse-border-red{0%,100%{border-color:#ef4444}50%{border-color:rgba(239,68,68,.4)}}
+.ldsp-user.not-logged .ldsp-user-display-name{color:var(--warn);-webkit-text-fill-color:var(--warn)}
 .ldsp-login-hint{font-size:9px;color:var(--warn);margin-left:4px;animation:blink 1.5s ease-in-out infinite;background:var(--warn-bg);padding:2px 6px;border-radius:8px;font-weight:500}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.6}}
 .ldsp-user-meta{display:flex;align-items:center;gap:8px;margin-top:3px}
 
-.ldsp-reading{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 12px;border-radius:var(--r-md);min-width:75px;position:relative;overflow:visible;border:1px solid var(--border);transition:margin .3s var(--ease)}
+.ldsp-reading{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 12px;border-radius:var(--r-md);min-width:70px;position:relative;overflow:visible;border:1px solid var(--border);transition:all .2s var(--ease)}
 .ldsp-reading::before{content:'';position:absolute;inset:0;border-radius:inherit;background:linear-gradient(180deg,rgba(255,255,255,.05) 0%,transparent 100%);pointer-events:none}
 .ldsp-reading-icon{font-size:20px;margin-bottom:3px;animation:bounce 2.5s ease-in-out infinite;filter:drop-shadow(0 2px 4px rgba(0,0,0,.2))}
 @keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
 .ldsp-reading-time{font-size:13px;font-weight:800;letter-spacing:-.02em}
 .ldsp-reading-label{font-size:9px;opacity:.85;margin-top:2px;font-weight:600;letter-spacing:.02em}
-.ldsp-reading{margin-bottom:18px;margin-top:4px;--rc:#94a3b8}
-.ldsp-reading::after{content:'未活动 已停止记录';position:absolute;bottom:-18px;left:50%;transform:translateX(-50%);font-size:9px;color:var(--err);white-space:nowrap;font-weight:600;letter-spacing:.02em;text-shadow:0 1px 3px rgba(0,0,0,.1);opacity:.8}
+.ldsp-reading{--rc:#94a3b8}
+.ldsp-reading::after{content:'未活动 已停止记录';position:absolute;bottom:-14px;left:50%;transform:translateX(-50%);font-size:8px;color:var(--err);white-space:nowrap;font-weight:600;letter-spacing:.02em;opacity:.8}
 .ldsp-reading.tracking{animation:reading-glow 2s ease-in-out infinite}
 .ldsp-reading.tracking::after{content:'阅读时间记录中...';color:var(--rc);opacity:1}
 @keyframes reading-glow{0%,100%{box-shadow:0 0 8px color-mix(in srgb,var(--rc) 40%,transparent),0 0 16px color-mix(in srgb,var(--rc) 20%,transparent),0 0 24px color-mix(in srgb,var(--rc) 10%,transparent)}50%{box-shadow:0 0 16px color-mix(in srgb,var(--rc) 60%,transparent),0 0 32px color-mix(in srgb,var(--rc) 35%,transparent),0 0 48px color-mix(in srgb,var(--rc) 15%,transparent)}}
@@ -2316,10 +2347,10 @@
 @keyframes crown{0%,100%{transform:rotate(-8deg) scale(1)}50%{transform:rotate(8deg) scale(1.2)}}
 
 .ldsp-tabs{display:flex;padding:10px 12px;gap:8px;background:var(--bg);border-bottom:1px solid var(--border)}
-.ldsp-tab{flex:1;padding:8px 12px;border:none;background:var(--bg-card);color:var(--txt-sec);border-radius:var(--r-sm);cursor:pointer;font-size:11px;font-weight:600;transition:all .2s var(--ease);border:1px solid transparent}
+.ldsp-tab{flex:1;padding:8px 12px;border:none;background:var(--bg-card);color:var(--txt-sec);border-radius:var(--r-sm);font-size:11px;font-weight:600;transition:all .2s var(--ease);border:1px solid transparent}
 .ldsp-tab:hover{background:var(--bg-hover);color:var(--txt);border-color:var(--border2);transform:translateY(-1px)}
-.ldsp-tab.active{background:var(--grad);color:#fff;box-shadow:0 4px 15px rgba(139,92,246,.3);border-color:transparent}
-.ldsp-content{max-height:calc(var(--h) - 180px);overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--accent) transparent}
+.ldsp-tab.active{background:var(--grad);color:#fff;box-shadow:0 4px 15px rgba(107,140,239,.3);border-color:transparent}
+.ldsp-content{flex:1;max-height:calc(var(--h) - 180px);overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--accent) transparent}
 .ldsp-content::-webkit-scrollbar{width:6px}
 .ldsp-content::-webkit-scrollbar-track{background:transparent}
 .ldsp-content::-webkit-scrollbar-thumb{background:linear-gradient(180deg,var(--accent),var(--accent2));border-radius:4px}
@@ -2328,7 +2359,7 @@
 .ldsp-section.active{display:block;animation:enter var(--dur) var(--ease-out)}
 @keyframes enter{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
 .ldsp-ring{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:var(--bg-card);border-radius:var(--r-md);margin-bottom:10px;position:relative;overflow:hidden;border:1px solid var(--border);gap:12px}
-.ldsp-ring::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 50% 0%,rgba(139,92,246,.08) 0%,transparent 70%);pointer-events:none}
+.ldsp-ring::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 50% 0%,rgba(107,140,239,.08) 0%,transparent 70%);pointer-events:none}
 .ldsp-ring-stat{display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:50px;gap:4px;z-index:1}
 .ldsp-ring-stat-val{font-size:18px;font-weight:800;letter-spacing:-.02em}
 .ldsp-ring-stat-val.ok{color:var(--ok)}
@@ -2342,15 +2373,15 @@
 .ldsp-ring-fill.anim{animation:ring 1.5s var(--ease) forwards}
 @keyframes ring{from{stroke-dashoffset:var(--circ)}to{stroke-dashoffset:var(--off)}}
 .ldsp-ring-txt{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center}
-.ldsp-ring-val{font-size:18px;font-weight:800;background:var(--grad);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:-.02em}
+.ldsp-ring-val{font-size:clamp(12px,calc(var(--ring) * 0.2),18px);font-weight:800;background:var(--grad);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:-.02em}
 .ldsp-ring-val.anim{animation:val 1s var(--ease-spring) .5s forwards;opacity:0}
 @keyframes val{from{opacity:0;transform:scale(.6)}60%{transform:scale(1.1)}to{opacity:1;transform:scale(1)}}
 .ldsp-ring-lbl{font-size:9px;color:var(--txt-mut);margin-top:2px;font-weight:500}
-.ldsp-ring-lvl{font-size:12px;font-weight:700;margin-top:8px;padding:4px 14px;border-radius:12px;background-image:linear-gradient(90deg,#64748b 0%,#94a3b8 50%,#64748b 100%);background-size:200% 100%;background-position:0% 50%;color:#fff;box-shadow:0 2px 10px rgba(100,116,139,.35);letter-spacing:.03em;text-shadow:0 1px 2px rgba(0,0,0,.2);cursor:pointer;transition:transform 2s ease;transform-style:preserve-3d;animation:lvl-shimmer 4s ease-in-out infinite}
+.ldsp-ring-lvl{font-size:12px;font-weight:700;margin-top:8px;padding:4px 14px;border-radius:12px;background-image:linear-gradient(90deg,#64748b 0%,#94a3b8 50%,#64748b 100%);background-size:200% 100%;background-position:0% 50%;color:#fff;box-shadow:0 2px 10px rgba(100,116,139,.35);letter-spacing:.03em;text-shadow:0 1px 2px rgba(0,0,0,.2);transition:transform 2s ease;transform-style:preserve-3d;animation:lvl-shimmer 4s ease-in-out infinite}
 .ldsp-ring-lvl:hover{transform:rotateY(360deg);animation-play-state:paused}
 .ldsp-ring-lvl.lv1{background-image:linear-gradient(90deg,#64748b 0%,#94a3b8 50%,#64748b 100%);box-shadow:0 2px 10px rgba(100,116,139,.35);animation-duration:4s}
 .ldsp-ring-lvl.lv2{background-image:linear-gradient(90deg,#3b82f6 0%,#60a5fa 50%,#3b82f6 100%);box-shadow:0 2px 10px rgba(59,130,246,.4);animation-duration:3.5s}
-.ldsp-ring-lvl.lv3{background-image:linear-gradient(90deg,#7c3aed 0%,#a78bfa 30%,#06b6d4 70%,#7c3aed 100%);box-shadow:0 2px 12px rgba(139,92,246,.45);animation-duration:3s}
+.ldsp-ring-lvl.lv3{background-image:linear-gradient(90deg,#5070d0 0%,#8aa4f4 30%,#5bb5a6 70%,#5070d0 100%);box-shadow:0 2px 12px rgba(107,140,239,.45);animation-duration:3s}
 .ldsp-ring-lvl.lv4{background-image:linear-gradient(90deg,#f59e0b 0%,#fbbf24 25%,#f97316 50%,#ef4444 75%,#f59e0b 100%);box-shadow:0 2px 15px rgba(245,158,11,.5),0 0 20px rgba(249,115,22,.3);animation-duration:2.5s;animation-name:lvl-shimmer-gold}
 @keyframes lvl-shimmer{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
 @keyframes lvl-shimmer-gold{0%,100%{background-position:0% 50%;filter:brightness(1)}50%{background-position:100% 50%;filter:brightness(1.2)}}
@@ -2360,7 +2391,7 @@
 @keyframes confetti-burst{0%{opacity:1;transform:translate(-50%,-50%) scale(0)}5%{opacity:1;transform:translate(-50%,-50%) scale(1.5)}25%{opacity:1;transform:translate(calc(var(--tx) * 1.2),calc(var(--ty) * 1.2)) rotate(calc(var(--rot) * 0.4)) scale(1.1)}100%{opacity:0;transform:translate(calc(var(--tx) + var(--drift)),calc(var(--ty) + 110px)) rotate(var(--rot)) scale(0.2)}}
 .ldsp-ring-tip{font-size:11px;text-align:center;margin:12px 0 16px;padding:8px 14px;border-radius:20px;font-weight:600;letter-spacing:.02em}
 .ldsp-ring-tip.ok{color:var(--ok);background:linear-gradient(135deg,var(--ok-bg),rgba(16,185,129,.05));border:1px solid rgba(16,185,129,.2)}
-.ldsp-ring-tip.progress{color:var(--accent);background:linear-gradient(135deg,rgba(139,92,246,.1),rgba(6,182,212,.05));border:1px solid rgba(139,92,246,.2)}
+.ldsp-ring-tip.progress{color:var(--accent);background:linear-gradient(135deg,rgba(107,140,239,.1),rgba(6,182,212,.05));border:1px solid rgba(107,140,239,.2)}
 .ldsp-ring-tip.max{color:var(--warn);background:linear-gradient(135deg,rgba(251,191,36,.1),rgba(249,115,22,.05));border:1px solid rgba(251,191,36,.25)}
 .ldsp-item{display:flex;align-items:center;padding:8px 10px;margin-bottom:6px;background:var(--bg-card);border-radius:var(--r-sm);border-left:3px solid var(--border2);animation:item var(--dur) var(--ease-out) backwards;transition:all .2s var(--ease);border:1px solid var(--border);border-left-width:3px}
 .ldsp-item:nth-child(1){animation-delay:0ms}.ldsp-item:nth-child(2){animation-delay:25ms}.ldsp-item:nth-child(3){animation-delay:50ms}.ldsp-item:nth-child(4){animation-delay:75ms}.ldsp-item:nth-child(5){animation-delay:100ms}.ldsp-item:nth-child(6){animation-delay:125ms}.ldsp-item:nth-child(7){animation-delay:150ms}.ldsp-item:nth-child(8){animation-delay:175ms}.ldsp-item:nth-child(9){animation-delay:200ms}.ldsp-item:nth-child(10){animation-delay:225ms}.ldsp-item:nth-child(11){animation-delay:250ms}.ldsp-item:nth-child(12){animation-delay:275ms}
@@ -2389,9 +2420,9 @@
 .ldsp-subtabs::-webkit-scrollbar{height:4px}
 .ldsp-subtabs::-webkit-scrollbar-track{background:var(--bg-el);border-radius:2px}
 .ldsp-subtabs::-webkit-scrollbar-thumb{background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:2px}
-.ldsp-subtab{padding:6px 12px;border:1px solid var(--border2);background:var(--bg-card);color:var(--txt-sec);border-radius:20px;cursor:pointer;font-size:10px;font-weight:600;white-space:nowrap;flex-shrink:0;transition:all .2s var(--ease)}
-.ldsp-subtab:hover{border-color:var(--accent);color:var(--accent);background:rgba(139,92,246,.08);transform:translateY(-1px)}
-.ldsp-subtab.active{background:var(--grad);border-color:transparent;color:#fff;box-shadow:0 4px 12px rgba(139,92,246,.25)}
+.ldsp-subtab{padding:6px 12px;border:1px solid var(--border2);background:var(--bg-card);color:var(--txt-sec);border-radius:20px;font-size:10px;font-weight:600;white-space:nowrap;flex-shrink:0;transition:all .2s var(--ease)}
+.ldsp-subtab:hover{border-color:var(--accent);color:var(--accent);background:rgba(107,140,239,.08);transform:translateY(-1px)}
+.ldsp-subtab.active{background:var(--grad);border-color:transparent;color:#fff;box-shadow:0 4px 12px rgba(107,140,239,.25)}
 .ldsp-chart{background:var(--bg-card);border-radius:var(--r-md);padding:12px;margin-bottom:10px;border:1px solid var(--border);position:relative;overflow:hidden}
 .ldsp-chart::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--accent),transparent);opacity:.2}
 .ldsp-chart:last-child{margin-bottom:0}
@@ -2403,7 +2434,7 @@
 .ldsp-spark-bars{flex:1;display:flex;align-items:flex-end;gap:3px;height:24px}
 .ldsp-spark-bar{flex:1;background:linear-gradient(180deg,var(--accent),var(--accent2));border-radius:3px 3px 0 0;min-height:3px;opacity:.35;position:relative;transition:all .2s var(--ease)}
 .ldsp-spark-bar:last-child{opacity:1}
-.ldsp-spark-bar:hover{opacity:1;transform:scaleY(1.15);box-shadow:0 -4px 12px rgba(139,92,246,.3)}
+.ldsp-spark-bar:hover{opacity:1;transform:scaleY(1.15);box-shadow:0 -4px 12px rgba(107,140,239,.3)}
 .ldsp-spark-bar::after{content:attr(data-v);position:absolute;bottom:100%;left:50%;transform:translateX(-50%) translateY(5px);font-size:9px;background:var(--bg-el);padding:3px 6px;border-radius:4px;opacity:0;white-space:nowrap;pointer-events:none;border:1px solid var(--border2);box-shadow:0 4px 12px rgba(0,0,0,.2);transition:all .15s var(--ease)}
 .ldsp-spark-bar:hover::after{opacity:1;transform:translateX(-50%) translateY(-2px)}
 .ldsp-spark-val{font-size:11px;font-weight:700;min-width:35px;text-align:right;color:var(--accent)}
@@ -2429,6 +2460,7 @@
 .ldsp-track{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg-card);border-radius:var(--r-sm);margin-bottom:10px;font-size:10px;color:var(--txt-mut);border:1px solid var(--border);font-weight:500}
 .ldsp-track-dot{width:8px;height:8px;border-radius:50%;background:var(--ok);animation:pulse 2s ease-in-out infinite;box-shadow:0 0 10px rgba(16,185,129,.4)}
 @keyframes pulse{0%,100%{opacity:1;transform:scale(1);box-shadow:0 0 10px rgba(16,185,129,.4)}50%{opacity:.6;transform:scale(.85);box-shadow:0 0 5px rgba(16,185,129,.2)}}
+@keyframes gradient-shift{0%{background-position:0% center}50%{background-position:100% center}100%{background-position:0% center}}
 .ldsp-rd-prog{background:var(--bg-card);border-radius:var(--r-md);padding:12px;margin-bottom:10px;border:1px solid var(--border)}
 .ldsp-rd-prog-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
 .ldsp-rd-prog-title{font-size:11px;color:var(--txt-sec);font-weight:600}
@@ -2438,8 +2470,8 @@
 .ldsp-rd-prog-fill::after{content:'';position:absolute;top:0;left:0;right:0;height:50%;background:linear-gradient(180deg,rgba(255,255,255,.2) 0%,transparent 100%);border-radius:4px 4px 0 0}
 .ldsp-rd-week{display:flex;justify-content:space-between;align-items:flex-end;height:55px;padding:0 4px;margin:12px 0 8px;gap:4px}
 .ldsp-rd-day{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0}
-.ldsp-rd-day-bar{width:100%;max-width:18px;background:linear-gradient(180deg,var(--accent) 0%,var(--accent2) 100%);border-radius:4px 4px 0 0;min-height:3px;cursor:pointer;position:relative;transition:all .2s var(--ease)}
-.ldsp-rd-day-bar:hover{transform:scaleX(1.2);box-shadow:0 -4px 15px rgba(139,92,246,.3)}
+.ldsp-rd-day-bar{width:100%;max-width:18px;background:linear-gradient(180deg,var(--accent) 0%,var(--accent2) 100%);border-radius:4px 4px 0 0;min-height:3px;position:relative;transition:all .2s var(--ease)}
+.ldsp-rd-day-bar:hover{transform:scaleX(1.2);box-shadow:0 -4px 15px rgba(91,181,166,.35)}
 .ldsp-rd-day-bar::after{content:attr(data-t);position:absolute;bottom:100%;left:50%;transform:translateX(-50%) translateY(5px);background:var(--bg-el);padding:4px 8px;border-radius:6px;font-size:9px;font-weight:600;white-space:nowrap;opacity:0;pointer-events:none;margin-bottom:4px;border:1px solid var(--border2);box-shadow:0 4px 12px rgba(0,0,0,.2);transition:all .15s var(--ease)}
 .ldsp-rd-day-bar:hover::after{opacity:1;transform:translateX(-50%) translateY(0)}
 .ldsp-rd-day-lbl{font-size:9px;color:var(--txt-mut);line-height:1;font-weight:500}
@@ -2451,18 +2483,22 @@
 .ldsp-today-stat-lbl{font-size:10px;color:var(--txt-mut);margin-top:4px;font-weight:500}
 .ldsp-time-info{font-size:10px;color:var(--txt-mut);text-align:center;padding:8px 10px;background:var(--bg-card);border-radius:var(--r-sm);margin-bottom:10px;border:1px solid var(--border);font-weight:500}
 .ldsp-time-info span{color:var(--accent);font-weight:700}
-.ldsp-year-heatmap{padding:10px 14px 10px 0;overflow-x:hidden;overflow-y:auto;max-height:320px}
+.ldsp-year-heatmap{padding:10px 14px 10px 0;overflow-x:hidden;overflow-y:auto;max-height:320px;scrollbar-width:thin;scrollbar-color:var(--border2) transparent}
+.ldsp-year-heatmap::-webkit-scrollbar{width:4px}
+.ldsp-year-heatmap::-webkit-scrollbar-track{background:transparent}
+.ldsp-year-heatmap::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px}
+.ldsp-year-heatmap::-webkit-scrollbar-thumb:hover{background:var(--accent)}
 .ldsp-year-wrap{display:flex;flex-direction:column;gap:3px;width:100%;padding-right:6px}
 .ldsp-year-row{display:flex;align-items:center;gap:4px;width:100%;position:relative}
 .ldsp-year-month{width:28px;font-size:8px;font-weight:600;color:var(--txt-mut);text-align:right;flex-shrink:0;line-height:1;position:absolute;left:0;top:50%;transform:translateY(-50%)}
 .ldsp-year-cells{display:grid;grid-template-columns:repeat(14,minmax(9px,1fr));gap:3px;width:100%;align-items:center;margin-left:32px}
-.ldsp-year-cell{width:100%;aspect-ratio:1;border-radius:3px;background:var(--bg-card);border:1px solid var(--border);cursor:pointer;position:relative;transition:all .15s var(--ease)}
-.ldsp-year-cell:hover{transform:scale(1.6);box-shadow:0 4px 15px rgba(139,92,246,.4);border-color:var(--accent);z-index:10}
-.ldsp-year-cell.l0{background:rgba(139,92,246,.06);border-color:rgba(139,92,246,.12)}
-.ldsp-year-cell.l1{background:rgba(139,92,246,.2);border-color:rgba(139,92,246,.3)}
-.ldsp-year-cell.l2{background:rgba(139,92,246,.4);border-color:rgba(139,92,246,.5)}
-.ldsp-year-cell.l3{background:rgba(139,92,246,.6);border-color:rgba(139,92,246,.7)}
-.ldsp-year-cell.l4{background:linear-gradient(135deg,var(--accent),var(--accent2));border-color:var(--accent);box-shadow:0 0 8px rgba(139,92,246,.3)}
+.ldsp-year-cell{width:100%;aspect-ratio:1;border-radius:3px;background:var(--bg-card);border:1px solid var(--border);position:relative;transition:all .15s var(--ease)}
+.ldsp-year-cell:hover{transform:scale(1.6);box-shadow:0 4px 15px rgba(107,140,239,.4);border-color:var(--accent);z-index:10}
+.ldsp-year-cell.l0{background:rgba(107,140,239,.1);border-color:rgba(107,140,239,.18)}
+.ldsp-year-cell.l1{background:rgba(107,140,239,.25);border-color:rgba(107,140,239,.35)}
+.ldsp-year-cell.l2{background:rgba(107,140,239,.42);border-color:rgba(107,140,239,.52)}
+.ldsp-year-cell.l3{background:rgba(91,181,166,.5);border-color:rgba(91,181,166,.6)}
+.ldsp-year-cell.l4{background:linear-gradient(135deg,var(--accent),var(--accent2));border-color:var(--accent);box-shadow:0 0 8px rgba(107,140,239,.3)}
 .ldsp-year-cell.empty{background:0 0;border-color:transparent;cursor:default}
 .ldsp-year-cell.empty:hover{transform:none;box-shadow:none}
 .ldsp-year-tip{position:absolute;left:50%;transform:translateX(-50%);background:var(--bg-el);padding:5px 8px;border-radius:6px;font-size:9px;white-space:nowrap;opacity:0;pointer-events:none;border:1px solid var(--border2);z-index:1000;line-height:1.3;box-shadow:0 4px 15px rgba(0,0,0,.25);font-weight:500}
@@ -2480,7 +2516,7 @@
 .ldsp-mini-loader{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:50px 20px;color:var(--txt-mut)}
 .ldsp-mini-spin{width:32px;height:32px;border:3px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;margin-bottom:14px}
 .ldsp-mini-txt{font-size:11px;font-weight:500}
-.ldsp-toast{position:absolute;bottom:-55px;left:50%;transform:translateX(-50%) translateY(15px);background:var(--grad);color:#fff;padding:10px 18px;border-radius:20px;font-size:12px;font-weight:600;box-shadow:0 8px 30px rgba(139,92,246,.4);opacity:0;white-space:nowrap;display:flex;align-items:center;gap:8px;z-index:100000;transition:all .3s var(--ease-spring)}
+.ldsp-toast{position:absolute;bottom:-55px;left:50%;transform:translateX(-50%) translateY(15px);background:var(--grad);color:#fff;padding:10px 18px;border-radius:20px;font-size:12px;font-weight:600;box-shadow:0 8px 30px rgba(107,140,239,.4);opacity:0;white-space:nowrap;display:flex;align-items:center;gap:8px;z-index:100000;transition:all .3s var(--ease-spring)}
 .ldsp-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .ldsp-modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;z-index:100001;opacity:0;transition:opacity .3s var(--ease)}
 .ldsp-modal-overlay.show{opacity:1}
@@ -2496,9 +2532,9 @@
 .ldsp-modal-body li::before{content:'';position:absolute;left:0;top:6px;width:6px;height:6px;background:var(--accent);border-radius:50%}
 .ldsp-modal-body strong{color:var(--accent);font-weight:600}
 .ldsp-modal-footer{display:flex;gap:12px}
-.ldsp-modal-btn{flex:1;padding:12px 18px;border:none;border-radius:var(--r-md);font-size:13px;font-weight:600;cursor:pointer;transition:all .2s var(--ease)}
-.ldsp-modal-btn.primary{background:var(--grad);color:#fff;box-shadow:0 4px 15px rgba(139,92,246,.3)}
-.ldsp-modal-btn.primary:hover{transform:translateY(-2px);box-shadow:0 8px 25px rgba(139,92,246,.4)}
+.ldsp-modal-btn{flex:1;padding:12px 18px;border:none;border-radius:var(--r-md);font-size:13px;font-weight:600;transition:all .2s var(--ease)}
+.ldsp-modal-btn.primary{background:var(--grad);color:#fff;box-shadow:0 4px 15px rgba(107,140,239,.3)}
+.ldsp-modal-btn.primary:hover{transform:translateY(-2px);box-shadow:0 8px 25px rgba(107,140,239,.4)}
 .ldsp-modal-btn.primary:active{transform:translateY(0)}
 .ldsp-modal-btn.secondary{background:var(--bg-el);color:var(--txt-sec);border:1px solid var(--border2)}
 .ldsp-modal-btn.secondary:hover{background:var(--bg-hover);border-color:var(--border-accent)}
@@ -2508,9 +2544,9 @@
 .ldsp-lb-status{display:flex;align-items:center;gap:10px}
 .ldsp-lb-dot{width:10px;height:10px;border-radius:50%;background:var(--txt-mut);transition:all .3s}
 .ldsp-lb-dot.joined{background:var(--ok);box-shadow:0 0 10px rgba(16,185,129,.4)}
-.ldsp-lb-btn{padding:8px 14px;border:none;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;transition:all .2s var(--ease)}
-.ldsp-lb-btn.primary{background:var(--grad);color:#fff;box-shadow:0 4px 12px rgba(139,92,246,.25)}
-.ldsp-lb-btn.primary:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(139,92,246,.4)}
+.ldsp-lb-btn{padding:8px 14px;border:none;border-radius:20px;font-size:11px;font-weight:600;transition:all .2s var(--ease)}
+.ldsp-lb-btn.primary{background:var(--grad);color:#fff;box-shadow:0 4px 12px rgba(107,140,239,.25)}
+.ldsp-lb-btn.primary:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(107,140,239,.4)}
 .ldsp-lb-btn.primary:active{transform:translateY(0)}
 .ldsp-lb-btn.secondary{background:var(--bg-el);color:var(--txt-sec);border:1px solid var(--border2)}
 .ldsp-lb-btn.secondary:hover{background:var(--bg-hover);border-color:var(--border-accent)}
@@ -2523,7 +2559,7 @@
 .ldsp-rank-item.t1{background:linear-gradient(135deg,rgba(255,215,0,.12) 0%,rgba(255,185,0,.05) 100%);border:1px solid rgba(255,215,0,.35);box-shadow:0 4px 20px rgba(255,215,0,.15)}
 .ldsp-rank-item.t2{background:linear-gradient(135deg,rgba(192,192,192,.12) 0%,rgba(160,160,160,.05) 100%);border:1px solid rgba(192,192,192,.35)}
 .ldsp-rank-item.t3{background:linear-gradient(135deg,rgba(205,127,50,.12) 0%,rgba(181,101,29,.05) 100%);border:1px solid rgba(205,127,50,.35)}
-.ldsp-rank-item.me{border-left:3px solid var(--accent);box-shadow:0 0 15px rgba(139,92,246,.1)}
+.ldsp-rank-item.me{border-left:3px solid var(--accent);box-shadow:0 0 15px rgba(107,140,239,.1)}
 .ldsp-rank-num{width:28px;height:28px;border-radius:10px;background:var(--bg-el);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--txt-sec);flex-shrink:0}
 .ldsp-rank-item.t1 .ldsp-rank-num{background:linear-gradient(135deg,#ffd700 0%,#ffb700 100%);color:#1a1a1a;font-size:14px;box-shadow:0 4px 12px rgba(255,215,0,.4)}
 .ldsp-rank-item.t2 .ldsp-rank-num{background:linear-gradient(135deg,#e0e0e0 0%,#b0b0b0 100%);color:#1a1a1a;box-shadow:0 4px 12px rgba(192,192,192,.4)}
@@ -2538,7 +2574,7 @@
 .ldsp-rank-display-name{font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:85px}
 .ldsp-rank-username{font-size:10px;color:var(--txt-mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500}
 .ldsp-rank-name-only{font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ldsp-rank-me-tag{font-size:10px;color:var(--accent);margin-left:3px;font-weight:600;background:rgba(139,92,246,.1);padding:1px 6px;border-radius:8px}
+.ldsp-rank-me-tag{font-size:10px;color:var(--accent);margin-left:3px;font-weight:600;background:rgba(107,140,239,.1);padding:1px 6px;border-radius:8px}
 .ldsp-rank-time{font-size:13px;font-weight:800;color:var(--accent);white-space:nowrap;letter-spacing:-.02em}
 .ldsp-rank-item.t1 .ldsp-rank-time{color:#ffc107;text-shadow:0 0 10px rgba(255,193,7,.3)}
 .ldsp-rank-item.t2 .ldsp-rank-time{color:#b8b8b8}
@@ -2553,13 +2589,13 @@
 .ldsp-lb-period{font-size:10px;color:var(--txt-mut);text-align:center;padding:8px 10px;background:var(--bg-card);border-radius:var(--r-sm);margin-bottom:10px;display:flex;justify-content:center;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid var(--border);font-weight:500}
 .ldsp-lb-period span{color:var(--accent);font-weight:700}
 .ldsp-lb-period .ldsp-update-rule{font-size:9px;opacity:.8}
-.ldsp-lb-refresh{background:var(--bg-el);border:none;cursor:pointer;font-size:11px;padding:4px 8px;border-radius:6px;transition:all .2s var(--ease);opacity:.8}
+.ldsp-lb-refresh{background:var(--bg-el);border:none;font-size:11px;padding:4px 8px;border-radius:6px;transition:all .2s var(--ease);opacity:.8}
 .ldsp-lb-refresh:hover{opacity:1;background:var(--bg-hover);transform:scale(1.05)}
 .ldsp-lb-refresh:active{transform:scale(.95)}
 .ldsp-lb-refresh.spinning{animation:ldsp-spin .8s linear infinite}
 .ldsp-lb-refresh:disabled{opacity:.4;cursor:not-allowed;transform:none!important}
 @keyframes ldsp-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
-.ldsp-my-rank{display:flex;align-items:center;justify-content:space-between;padding:14px;background:var(--grad);border-radius:var(--r-md);margin-bottom:10px;color:#fff;position:relative;overflow:hidden;box-shadow:0 8px 25px rgba(139,92,246,.3)}
+.ldsp-my-rank{display:flex;align-items:center;justify-content:space-between;padding:14px;background:var(--grad);border-radius:var(--r-md);margin-bottom:10px;color:#fff;position:relative;overflow:hidden;box-shadow:0 8px 25px rgba(107,140,239,.3)}
 .ldsp-my-rank::before{content:'';position:absolute;top:-50%;right:-20%;width:100px;height:100px;background:radial-gradient(circle,rgba(255,255,255,.15) 0%,transparent 70%);pointer-events:none}
 .ldsp-my-rank.not-in-top{background:linear-gradient(135deg,#52525b 0%,#3f3f46 100%);box-shadow:0 8px 25px rgba(0,0,0,.2)}
 .ldsp-my-rank-lbl{font-size:11px;opacity:.9;font-weight:500}
@@ -2577,10 +2613,480 @@
 @media (max-height:700px){#ldsp-panel{top:60px}.ldsp-content{max-height:calc(100vh - 240px)}}
 @media (max-width:1200px){#ldsp-panel{right:10px;left:auto}}
 @media (max-width:768px){#ldsp-panel{--w:290px;--fs:12px;--pd:11px;right:8px;left:auto;top:60px}#ldsp-panel.collapsed{width:42px!important;height:42px!important}#ldsp-panel.collapsed .ldsp-toggle{font-size:16px}.ldsp-hdr{padding:8px 10px}.ldsp-site-icon{width:22px;height:22px;border-radius:6px}.ldsp-site-ver{font-size:8px;padding:1px 5px}.ldsp-title{font-size:13px}.ldsp-ver{font-size:9px}.ldsp-hdr-btns{gap:4px}.ldsp-hdr-btns button{width:26px;height:26px;font-size:12px}.ldsp-update-bubble{width:200px;padding:14px 16px}.ldsp-content{max-height:calc(100vh - 240px)}.ldsp-rank-item{padding:10px}.ldsp-rank-num{width:26px;height:26px}.ldsp-rank-avatar{width:30px;height:30px}}
-@media (max-width:480px){#ldsp-panel{--w:270px;--av:36px;--ring:68px;right:6px;left:auto;top:55px;border-radius:var(--r-md)}#ldsp-panel.collapsed{width:38px!important;height:38px!important;border-radius:10px}#ldsp-panel.collapsed .ldsp-toggle{font-size:14px}.ldsp-hdr{padding:6px 8px}.ldsp-hdr-info{gap:6px}.ldsp-hdr-btns{gap:3px}.ldsp-hdr-btns button{width:24px;height:24px;font-size:11px;border-radius:6px}.ldsp-site-icon{width:20px;height:20px;border-radius:5px}.ldsp-site-ver{font-size:7px;padding:1px 4px}.ldsp-title{font-size:12px}.ldsp-ver{font-size:8px}.ldsp-user{padding:10px;gap:10px}.ldsp-reading{min-width:65px;padding:6px 8px;margin-bottom:20px}.ldsp-reading-icon{font-size:16px}.ldsp-reading-time{font-size:11px}.ldsp-reading-label{font-size:8px}.ldsp-tabs{padding:8px 10px;gap:6px}.ldsp-tab{padding:6px 10px;font-size:10px;border-radius:var(--r-sm)}.ldsp-section{padding:8px}.ldsp-rank-item{padding:8px 10px}.ldsp-rank-num{width:24px;height:24px;font-size:10px;border-radius:8px}.ldsp-rank-avatar{width:28px;height:28px;border-radius:8px}.ldsp-rank-display-name,.ldsp-rank-name-only{font-size:11px}.ldsp-rank-time{font-size:12px}.ldsp-my-rank{padding:10px}.ldsp-my-rank-val{font-size:16px}.ldsp-subtab{padding:5px 10px;font-size:9px}}
-@media (max-height:500px){#ldsp-panel{top:40px}.ldsp-content{max-height:calc(100vh - 180px)}.ldsp-user{padding:8px}.ldsp-reading{display:none}.ldsp-tabs{padding:6px 8px}.ldsp-section{padding:6px}}`;
+@media (max-width:480px){#ldsp-panel{--w:270px;--av:36px;--ring:68px;right:6px;left:auto;top:55px;border-radius:var(--r-md);max-height:60vh}#ldsp-panel.collapsed{width:38px!important;height:38px!important;border-radius:10px;max-height:none}#ldsp-panel.collapsed .ldsp-toggle{font-size:14px}.ldsp-hdr{padding:6px 8px}.ldsp-hdr-info{gap:6px}.ldsp-hdr-btns{gap:3px}.ldsp-hdr-btns button{width:24px;height:24px;font-size:11px;border-radius:6px}.ldsp-site-icon{width:20px;height:20px;border-radius:5px}.ldsp-site-ver{font-size:7px;padding:1px 4px}.ldsp-title{font-size:12px}.ldsp-ver{font-size:8px}.ldsp-user{padding:8px;gap:8px}.ldsp-user-actions{gap:4px}.ldsp-action-btn{padding:4px 6px;font-size:9px;flex:0 1 calc(50% - 2px)}.ldsp-action-btn:only-child{flex:0 1 auto}.ldsp-reading{min-width:60px;padding:5px 8px}.ldsp-reading-icon{font-size:16px}.ldsp-reading-time{font-size:10px}.ldsp-reading-label{font-size:7px}.ldsp-tabs{padding:8px 10px;gap:6px}.ldsp-tab{padding:6px 10px;font-size:10px;border-radius:var(--r-sm)}.ldsp-section{padding:8px}.ldsp-content{max-height:calc(60vh - 180px)}.ldsp-rank-item{padding:8px 10px}.ldsp-rank-num{width:24px;height:24px;font-size:10px;border-radius:8px}.ldsp-rank-avatar{width:28px;height:28px;border-radius:8px}.ldsp-rank-display-name,.ldsp-rank-name-only{font-size:11px}.ldsp-rank-time{font-size:12px}.ldsp-my-rank{padding:10px}.ldsp-my-rank-val{font-size:16px}.ldsp-subtab{padding:5px 10px;font-size:9px}}
+@media (max-height:500px){#ldsp-panel{top:40px}.ldsp-content{max-height:calc(100vh - 180px)}.ldsp-user{padding:8px}.ldsp-user-actions{display:none}.ldsp-tabs{padding:6px 8px}.ldsp-section{padding:6px}}
+.ldsp-action-btn{display:inline-flex;align-items:center;gap:4px;padding:5px 10px;background:linear-gradient(135deg,rgba(107,140,239,.08),rgba(90,125,224,.12));border:1px solid rgba(107,140,239,.2);border-radius:8px;font-size:10px;color:var(--accent);transition:all .2s var(--ease);font-weight:600;white-space:nowrap;flex:0 1 calc(50% - 3px);min-width:60px;justify-content:center}
+.ldsp-action-btn:hover{background:linear-gradient(135deg,rgba(107,140,239,.15),rgba(90,125,224,.2));border-color:var(--accent);box-shadow:0 4px 12px rgba(107,140,239,.18)}
+.ldsp-action-btn:only-child{flex:0 1 auto}
+.ldsp-action-btn .ldsp-action-icon{flex-shrink:0}
+.ldsp-action-btn .ldsp-action-text{overflow:hidden;text-overflow:ellipsis}
+@media (max-width:320px){.ldsp-user-actions{flex-direction:column}.ldsp-action-btn{flex:1 1 100%;min-width:0}}
+.ldsp-ticket-btn{}
+.ldsp-ticket-btn .ldsp-ticket-badge{background:var(--err);color:#fff;font-size:8px;padding:2px 5px;border-radius:8px;margin-left:2px;font-weight:700;animation:pulse 2s ease infinite}
+.ldsp-ticket-overlay{position:absolute;top:0;left:0;right:0;bottom:0;background:var(--bg);border-radius:0 0 var(--r-lg) var(--r-lg);z-index:10;display:none;flex-direction:column;overflow:hidden}
+.ldsp-ticket-overlay.show{display:flex}
+.ldsp-ticket-header{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--bg-card);border-bottom:1px solid var(--border);flex-shrink:0}
+.ldsp-ticket-title{font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px;color:var(--txt)}
+.ldsp-ticket-close{width:24px;height:24px;display:flex;align-items:center;justify-content:center;background:var(--bg-el);border:1px solid var(--border);border-radius:6px;font-size:12px;color:var(--txt-sec);transition:all .2s}
+.ldsp-ticket-close:hover{background:var(--err-bg);color:var(--err);border-color:var(--err)}
+.ldsp-ticket-tabs{display:flex;border-bottom:1px solid var(--border);padding:0 10px;background:var(--bg-card);flex-shrink:0}
+.ldsp-ticket-tab{padding:8px 12px;font-size:10px;font-weight:600;color:var(--txt-mut);border-bottom:2px solid transparent;transition:all .2s}
+.ldsp-ticket-tab.active{color:var(--accent);border-color:var(--accent)}
+.ldsp-ticket-tab:hover:not(.active){color:var(--txt-sec)}
+.ldsp-ticket-body{flex:1;overflow-y:auto;padding:12px;background:var(--bg);display:flex;flex-direction:column}
+.ldsp-ticket-body.detail-mode{padding:0;overflow:hidden}
+.ldsp-ticket-empty{text-align:center;padding:30px 16px;color:var(--txt-mut)}
+.ldsp-ticket-empty-icon{font-size:36px;margin-bottom:10px}
+.ldsp-ticket-list{display:flex;flex-direction:column;gap:8px}
+.ldsp-ticket-item{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-md);padding:10px;cursor:pointer;transition:all .2s}
+.ldsp-ticket-item:hover{background:var(--bg-hover);transform:translateX(3px)}
+.ldsp-ticket-item.has-reply{border-left:3px solid #ef4444;animation:pulse-border-red 2s ease infinite;background:rgba(239,68,68,.05)}
+.ldsp-ticket-item-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px}
+.ldsp-ticket-item-type{font-size:10px;color:var(--txt-sec)}
+.ldsp-ticket-item-status{font-size:9px;padding:2px 5px;border-radius:4px}
+.ldsp-ticket-item-status.open{background:var(--ok-bg);color:var(--ok)}
+.ldsp-ticket-item-status.closed{background:var(--bg-el);color:var(--txt-mut)}
+.ldsp-ticket-item-title{font-size:11px;font-weight:600;color:var(--txt);margin-bottom:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ldsp-ticket-item-meta{font-size:9px;color:var(--txt-mut);display:flex;gap:6px}
+.ldsp-ticket-form{display:flex;flex-direction:column;gap:10px}
+.ldsp-ticket-form-group{display:flex;flex-direction:column;gap:5px}
+.ldsp-ticket-label{font-size:10px;font-weight:600;color:var(--txt-sec)}
+.ldsp-ticket-types{display:flex;gap:6px;flex-wrap:wrap}
+.ldsp-ticket-type{flex:1;min-width:80px;padding:8px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-sm);text-align:center;cursor:pointer;transition:all .2s}
+.ldsp-ticket-type:hover{border-color:var(--accent)}
+.ldsp-ticket-type.selected{border-color:var(--accent);background:rgba(107,140,239,.1)}
+.ldsp-ticket-type-icon{font-size:16px;display:block;margin-bottom:3px}
+.ldsp-ticket-type-label{font-size:10px;color:var(--txt)}
+.ldsp-ticket-input{padding:8px;background:var(--bg-el);border:1px solid var(--border);border-radius:var(--r-sm);font-size:11px;color:var(--txt)}
+.ldsp-ticket-input:focus{border-color:var(--accent);outline:none}
+.ldsp-ticket-textarea{padding:8px;background:var(--bg-el);border:1px solid var(--border);border-radius:var(--r-sm);font-size:11px;color:var(--txt);min-height:80px;resize:vertical}
+.ldsp-ticket-textarea:focus{border-color:var(--accent);outline:none}
+.ldsp-ticket-submit{padding:10px;background:var(--grad);color:#fff;border:none;border-radius:var(--r-sm);font-size:11px;font-weight:600;cursor:pointer;transition:all .2s}
+.ldsp-ticket-submit:hover{box-shadow:0 4px 12px rgba(107,140,239,.3)}
+.ldsp-ticket-submit:disabled{opacity:.5;cursor:not-allowed}
+.ldsp-ticket-detail{display:flex;flex-direction:column;flex:1;min-height:0;background:var(--bg)}
+.ldsp-ticket-detail-top{padding:10px 12px;border-bottom:1px solid var(--border);background:var(--bg-card);flex-shrink:0}
+.ldsp-ticket-back{display:inline-flex;align-items:center;gap:4px;padding:5px 8px;background:var(--bg-el);border:1px solid var(--border);border-radius:var(--r-sm);font-size:10px;color:var(--txt-sec);transition:all .2s}
+.ldsp-ticket-back:hover{background:var(--bg-hover);color:var(--txt)}
+.ldsp-ticket-detail-header{margin-top:6px}
+.ldsp-ticket-detail-title{font-size:12px;font-weight:600;color:var(--txt);line-height:1.4;word-break:break-word}
+.ldsp-ticket-detail-meta{display:flex;flex-wrap:wrap;gap:5px;font-size:9px;color:var(--txt-mut);margin-top:5px}
+.ldsp-ticket-detail-meta span{background:var(--bg-el);padding:2px 5px;border-radius:3px}
+.ldsp-ticket-messages{flex:1;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:8px;min-height:0}
+.ldsp-ticket-reply{max-width:85%;padding:8px 10px;border-radius:var(--r-sm);font-size:11px;line-height:1.4;word-break:break-word}
+.ldsp-ticket-reply.user{background:linear-gradient(135deg,rgba(107,140,239,.12),rgba(90,125,224,.08));border:1px solid rgba(107,140,239,.2);margin-left:auto;border-bottom-right-radius:3px}
+.ldsp-ticket-reply.admin{background:var(--bg-card);border:1px solid var(--border);margin-right:auto;border-bottom-left-radius:3px}
+.ldsp-ticket-reply-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;font-size:9px;color:var(--txt-mut)}
+.ldsp-ticket-reply-author{font-weight:600}
+.ldsp-ticket-reply.admin .ldsp-ticket-reply-author{color:var(--ok)}
+.ldsp-ticket-reply-content{color:var(--txt);white-space:pre-wrap}
+.ldsp-ticket-input-area{border-top:1px solid var(--border);padding:10px 12px;background:var(--bg-card);flex-shrink:0}
+.ldsp-ticket-reply-form{display:flex;gap:6px;align-items:center}
+.ldsp-ticket-reply-input{flex:1;padding:6px 8px;background:var(--bg-el);border:1px solid var(--border);border-radius:var(--r-sm);font-size:11px;resize:none;min-height:32px;max-height:50px;color:var(--txt)}
+.ldsp-ticket-reply-input:focus{border-color:var(--accent);outline:none}
+.ldsp-ticket-reply-btn{padding:6px 12px;background:var(--grad);color:#fff;border:none;border-radius:var(--r-sm);font-size:10px;font-weight:600;transition:all .2s;flex-shrink:0;height:32px}
+.ldsp-ticket-reply-btn:hover{box-shadow:0 4px 12px rgba(107,140,239,.3)}
+.ldsp-ticket-reply-btn:disabled{opacity:.5;cursor:not-allowed}
+.ldsp-ticket-closed-hint{text-align:center;color:var(--txt-mut);font-size:10px;padding:10px}`;
         }
     };
+
+    // ==================== 工单管理器 ====================
+    class TicketManager {
+        constructor(oauth, panelBody) {
+            this.oauth = oauth;
+            this.panelBody = panelBody;
+            this.overlay = null;
+            this.ticketTypes = [];
+            this.tickets = [];
+            this.currentTicket = null;
+            this.currentView = 'list';
+            this.unreadCount = 0;
+            this._pollTimer = null;
+        }
+
+        async init() {
+            this._createOverlay();
+            await this._loadTicketTypes();
+            this._startUnreadPoll();
+        }
+
+        _createOverlay() {
+            this.overlay = document.createElement('div');
+            this.overlay.className = 'ldsp-ticket-overlay';
+            this.overlay.innerHTML = `
+                <div class="ldsp-ticket-header">
+                    <div class="ldsp-ticket-title">🎫 工单反馈</div>
+                    <div class="ldsp-ticket-close">×</div>
+                </div>
+                <div class="ldsp-ticket-tabs">
+                    <div class="ldsp-ticket-tab active" data-tab="list">我的工单</div>
+                    <div class="ldsp-ticket-tab" data-tab="create">提交工单</div>
+                </div>
+                <div class="ldsp-ticket-body"></div>`;
+            if (this.panelBody) {
+                this.panelBody.appendChild(this.overlay);
+            }
+            this._bindEvents();
+        }
+
+        _bindEvents() {
+            this.overlay.querySelector('.ldsp-ticket-close').addEventListener('click', () => this.hide());
+            document.addEventListener('keydown', e => {
+                if (e.key === 'Escape' && this.overlay.classList.contains('show')) this.hide();
+            });
+            this.overlay.querySelectorAll('.ldsp-ticket-tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    this.overlay.querySelectorAll('.ldsp-ticket-tab').forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    const tabName = tab.dataset.tab;
+                    if (tabName === 'list') {
+                        this._loadTickets().then(() => this._renderList());
+                    } else if (tabName === 'create') {
+                        this._renderCreate();
+                    }
+                });
+            });
+        }
+
+        async _loadTicketTypes() {
+            try {
+                const result = await this.oauth.api('/api/tickets/types');
+                const data = result.data?.data || result.data;
+                if (result.success && data?.types) {
+                    this.ticketTypes = data.types;
+                }
+            } catch (e) {
+                this.ticketTypes = [
+                    { id: 'feature_request', label: '功能建议', icon: '💡' },
+                    { id: 'bug_report', label: 'BUG反馈', icon: '🐛' }
+                ];
+            }
+        }
+
+        _startUnreadPoll() {
+            this._checkUnread();
+            this._pollTimer = setInterval(() => this._checkUnread(), 60000);
+        }
+
+        async _checkUnread() {
+            if (!this.oauth?.isLoggedIn()) return;
+            try {
+                const result = await this.oauth.api('/api/tickets/unread/count');
+                const data = result.data?.data || result.data;
+                if (result.success) {
+                    this.unreadCount = data?.count || 0;
+                    this._updateBadge();
+                }
+            } catch (e) {}
+        }
+
+        _updateBadge() {
+            const btn = document.querySelector('.ldsp-ticket-btn');
+            if (!btn) return;
+            let badge = btn.querySelector('.ldsp-ticket-badge');
+            if (this.unreadCount > 0) {
+                if (!badge) {
+                    badge = document.createElement('span');
+                    badge.className = 'ldsp-ticket-badge';
+                    btn.appendChild(badge);
+                }
+                badge.textContent = this.unreadCount > 99 ? '99+' : this.unreadCount;
+            } else if (badge) {
+                badge.remove();
+            }
+        }
+
+        async show() {
+            await this._loadTickets();
+            this._updateTabBadge();
+            this.currentView = 'list';
+            const activeTab = this.overlay.querySelector('.ldsp-ticket-tab.active');
+            if (activeTab?.dataset.tab === 'create') {
+                this._renderCreate();
+            } else {
+                this._renderList();
+            }
+            this.overlay.classList.add('show');
+        }
+
+        _updateTabBadge() {
+            const listTab = this.overlay.querySelector('.ldsp-ticket-tab[data-tab="list"]');
+            if (!listTab) return;
+            const hasUnread = this.tickets.some(t => t.has_new_reply);
+            listTab.classList.toggle('has-unread', hasUnread);
+        }
+
+        hide() {
+            this.overlay.classList.remove('show');
+            this.currentView = 'list';
+            this.currentTicket = null;
+            this.overlay.querySelectorAll('.ldsp-ticket-tab').forEach(t => t.classList.remove('active'));
+            this.overlay.querySelector('.ldsp-ticket-tab[data-tab="list"]')?.classList.add('active');
+        }
+
+        async _loadTickets() {
+            try {
+                const result = await this.oauth.api('/api/tickets');
+                const data = result.data?.data || result.data;
+                if (result.success) {
+                    this.tickets = data?.tickets || [];
+                }
+            } catch (e) {
+                this.tickets = [];
+            }
+        }
+
+        _renderList() {
+            this.currentView = 'list';
+            const body = this.overlay.querySelector('.ldsp-ticket-body');
+            body.classList.remove('detail-mode');
+            
+            if (this.tickets.length === 0) {
+                body.innerHTML = `
+                    <div class="ldsp-ticket-empty">
+                        <div class="ldsp-ticket-empty-icon">📭</div>
+                        <div>暂无工单记录</div>
+                        <div style="margin-top:6px;font-size:10px">点击"提交工单"反馈建议或问题</div>
+                    </div>`;
+                return;
+            }
+
+            body.innerHTML = `
+                <div class="ldsp-ticket-list">
+                    ${this.tickets.map(t => `
+                        <div class="ldsp-ticket-item ${t.has_new_reply ? 'has-reply' : ''}" data-id="${t.id}">
+                            <div class="ldsp-ticket-item-header">
+                                <span class="ldsp-ticket-item-type">${this._getTypeIcon(t.type)} ${this._getTypeLabel(t.type)}</span>
+                                <span class="ldsp-ticket-item-status ${t.status}">${t.status === 'open' ? '处理中' : '已关闭'}</span>
+                            </div>
+                            <div class="ldsp-ticket-item-title">${Utils.sanitize(t.title, 50)}</div>
+                            <div class="ldsp-ticket-item-meta">
+                                <span>#${t.id}</span>
+                                <span>${this._formatTime(t.created_at)}</span>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>`;
+
+            body.querySelectorAll('.ldsp-ticket-item').forEach(item => {
+                item.addEventListener('click', () => this._showDetail(item.dataset.id));
+            });
+        }
+
+        _renderCreate() {
+            this.currentView = 'create';
+            const body = this.overlay.querySelector('.ldsp-ticket-body');
+            body.classList.remove('detail-mode');
+            
+            if (!this.ticketTypes || this.ticketTypes.length === 0) {
+                this.ticketTypes = [
+                    { id: 'feature_request', label: '功能建议', icon: '💡' },
+                    { id: 'bug_report', label: 'BUG反馈', icon: '🐛' }
+                ];
+            }
+            
+            body.innerHTML = `
+                <div class="ldsp-ticket-form">
+                    <div class="ldsp-ticket-form-group">
+                        <div class="ldsp-ticket-label">工单类型</div>
+                        <div class="ldsp-ticket-types">
+                            ${this.ticketTypes.map((t, i) => `
+                                <div class="ldsp-ticket-type ${i === 0 ? 'selected' : ''}" data-type="${t.id}">
+                                    <span class="ldsp-ticket-type-icon">${t.icon}</span>
+                                    <span class="ldsp-ticket-type-label">${t.label}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                    <div class="ldsp-ticket-form-group">
+                        <div class="ldsp-ticket-label">标题 <span style="color:var(--txt-mut);font-weight:400">(4-50字)</span></div>
+                        <input type="text" class="ldsp-ticket-input" placeholder="简要描述您的问题或建议" minlength="4" maxlength="50">
+                    </div>
+                    <div class="ldsp-ticket-form-group">
+                        <div class="ldsp-ticket-label">详细描述 <span style="color:var(--txt-mut);font-weight:400">(8-500字)</span></div>
+                        <textarea class="ldsp-ticket-textarea" placeholder="请详细描述您的问题或建议..." minlength="8" maxlength="500"></textarea>
+                    </div>
+                    <button class="ldsp-ticket-submit">提交工单</button>
+                </div>`;
+
+            body.querySelectorAll('.ldsp-ticket-type').forEach(type => {
+                type.addEventListener('click', () => {
+                    body.querySelectorAll('.ldsp-ticket-type').forEach(t => t.classList.remove('selected'));
+                    type.classList.add('selected');
+                });
+            });
+
+            body.querySelector('.ldsp-ticket-submit').addEventListener('click', () => this._submitTicket());
+        }
+
+        async _submitTicket() {
+            const body = this.overlay.querySelector('.ldsp-ticket-body');
+            const type = body.querySelector('.ldsp-ticket-type.selected')?.dataset.type;
+            const title = body.querySelector('.ldsp-ticket-input')?.value.trim();
+            const content = body.querySelector('.ldsp-ticket-textarea')?.value.trim();
+            const btn = body.querySelector('.ldsp-ticket-submit');
+
+            if (!title || title.length < 4) { alert('标题至少需要4个字符'); return; }
+            if (title.length > 50) { alert('标题最多50个字符'); return; }
+            if (!content || content.length < 8) { alert('描述至少需要8个字符'); return; }
+            if (content.length > 500) { alert('描述最多500个字符'); return; }
+
+            btn.disabled = true;
+            btn.textContent = '提交中...';
+
+            try {
+                const result = await this.oauth.api('/api/tickets', {
+                    method: 'POST',
+                    body: JSON.stringify({ type: type || 'feature_request', title, content })
+                });
+                const data = result.data?.data || result.data;
+                if (result.success || data?.success) {
+                    await this._loadTickets();
+                    this.overlay.querySelectorAll('.ldsp-ticket-tab').forEach(t => t.classList.remove('active'));
+                    this.overlay.querySelector('.ldsp-ticket-tab[data-tab="list"]')?.classList.add('active');
+                    this._renderList();
+                } else {
+                    alert(result.error?.message || result.error || data?.error || '提交失败');
+                }
+            } catch (e) {
+                alert('提交失败: ' + (e.message || '网络错误'));
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '提交工单';
+            }
+        }
+
+        async _showDetail(ticketId) {
+            this.currentView = 'detail';
+            const body = this.overlay.querySelector('.ldsp-ticket-body');
+            body.classList.add('detail-mode');
+            body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;flex:1"><div class="ldsp-loading"><div class="ldsp-spinner"></div><div>加载中...</div></div></div>';
+
+            try {
+                const result = await this.oauth.api(`/api/tickets/${ticketId}`);
+                if (!result.success) throw new Error(result.error);
+                
+                const data = result.data?.data || result.data;
+                const ticket = data?.ticket || data;
+                const replies = ticket?.replies || [];
+                this.currentTicket = ticket;
+
+                body.innerHTML = `
+                    <div class="ldsp-ticket-detail">
+                        <div class="ldsp-ticket-detail-top">
+                            <div class="ldsp-ticket-back">← 返回</div>
+                            <div class="ldsp-ticket-detail-header">
+                                <div class="ldsp-ticket-detail-title">${Utils.sanitize(ticket.title, 100)}</div>
+                                <div class="ldsp-ticket-detail-meta">
+                                    <span>${this._getTypeIcon(ticket.type)} ${this._getTypeLabel(ticket.type)}</span>
+                                    <span>#${ticket.id}</span>
+                                    <span class="ldsp-ticket-item-status ${ticket.status}">${ticket.status === 'open' ? '处理中' : '已关闭'}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="ldsp-ticket-messages">
+                            <div class="ldsp-ticket-reply user">
+                                <div class="ldsp-ticket-reply-header">
+                                    <span class="ldsp-ticket-reply-author">👤 我</span>
+                                    <span>${this._formatTime(ticket.created_at)}</span>
+                                </div>
+                                <div class="ldsp-ticket-reply-content">${Utils.sanitize(ticket.content, 2000)}</div>
+                            </div>
+                            ${replies.map(r => `
+                                <div class="ldsp-ticket-reply ${r.is_admin ? 'admin' : 'user'}">
+                                    <div class="ldsp-ticket-reply-header">
+                                        <span class="ldsp-ticket-reply-author">${r.is_admin ? '👨‍💼 管理员' : '👤 我'}</span>
+                                        <span>${this._formatTime(r.created_at)}</span>
+                                    </div>
+                                    <div class="ldsp-ticket-reply-content">${Utils.sanitize(r.content, 2000)}</div>
+                                </div>
+                            `).join('')}
+                        </div>
+                        <div class="ldsp-ticket-input-area">
+                            ${ticket.status === 'open' ? `
+                                <div class="ldsp-ticket-reply-form">
+                                    <textarea class="ldsp-ticket-reply-input" placeholder="输入回复..." maxlength="500"></textarea>
+                                    <button class="ldsp-ticket-reply-btn">发送</button>
+                                </div>
+                            ` : '<div class="ldsp-ticket-closed-hint">此工单已关闭</div>'}
+                        </div>
+                    </div>`;
+
+                body.querySelector('.ldsp-ticket-back').addEventListener('click', () => {
+                    this._loadTickets().then(() => this._renderList());
+                });
+
+                const replyBtn = body.querySelector('.ldsp-ticket-reply-btn');
+                if (replyBtn) {
+                    replyBtn.addEventListener('click', () => this._sendReply(ticketId));
+                }
+                
+                requestAnimationFrame(() => {
+                    const messagesEl = body.querySelector('.ldsp-ticket-messages');
+                    if (messagesEl) messagesEl.scrollTop = messagesEl.scrollHeight;
+                });
+
+                if (ticket.has_new_reply) {
+                    this.oauth.api(`/api/tickets/${ticketId}/read`, { method: 'POST' }).catch(() => {});
+                    this._checkUnread();
+                    const t = this.tickets.find(x => x.id == ticketId);
+                    if (t) t.has_new_reply = false;
+                    this._updateTabBadge();
+                }
+            } catch (e) {
+                body.innerHTML = '<div class="ldsp-ticket-empty"><div class="ldsp-ticket-empty-icon">❌</div><div>加载失败</div></div>';
+            }
+        }
+
+        async _sendReply(ticketId) {
+            const body = this.overlay.querySelector('.ldsp-ticket-body');
+            const input = body.querySelector('.ldsp-ticket-reply-input');
+            const btn = body.querySelector('.ldsp-ticket-reply-btn');
+            const text = input?.value.trim();
+
+            if (!text) return;
+
+            btn.disabled = true;
+            try {
+                const result = await this.oauth.api(`/api/tickets/${ticketId}/reply`, {
+                    method: 'POST',
+                    body: JSON.stringify({ content: text })
+                });
+                if (result.success) {
+                    this._showDetail(ticketId);
+                } else {
+                    alert(result.error || '发送失败');
+                }
+            } catch (e) {
+                alert('网络错误');
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        _getTypeIcon(type) {
+            const t = this.ticketTypes.find(x => x.id === type);
+            return t?.icon || '📝';
+        }
+
+        _getTypeLabel(type) {
+            const t = this.ticketTypes.find(x => x.id === type);
+            return t?.label || type;
+        }
+
+        _formatTime(ts) {
+            if (!ts) return '';
+            const d = new Date(ts);
+            const now = new Date();
+            const diff = (now - d) / 1000;
+            if (diff < 60) return '刚刚';
+            if (diff < 3600) return `${Math.floor(diff / 60)}分钟前`;
+            if (diff < 86400) return `${Math.floor(diff / 3600)}小时前`;
+            if (diff < 2592000) return `${Math.floor(diff / 86400)}天前`;
+            return `${d.getMonth() + 1}/${d.getDate()}`;
+        }
+    }
 
     // ==================== 面板渲染器 ====================
     class Renderer {
@@ -2643,7 +3149,7 @@
                 tipClass = 'ok';
             }
 
-            const confettiColors = ['#7c3aed', '#06b6d4', '#f97316', '#22c55e', '#eab308', '#ec4899', '#f43f5e', '#8b5cf6'];
+            const confettiColors = ['#5070d0', '#5bb5a6', '#f97316', '#22c55e', '#eab308', '#ec4899', '#f43f5e', '#6b8cef'];
             const confettiPieces = pct === 100 ? Array.from({length: 28}, (_, i) => {
                 const color = confettiColors[i % confettiColors.length];
                 const angle = (i / 28) * 360 + (Math.random() - 0.5) * 25;
@@ -2670,7 +3176,7 @@
                 <div class="ldsp-ring-center">
                     <div class="ldsp-ring-wrap">
                         <svg width="${cfg.ringSize}" height="${cfg.ringSize}" viewBox="0 0 ${cfg.ringSize} ${cfg.ringSize}">
-                            <defs><linearGradient id="ldsp-grad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#7c3aed"/><stop offset="100%" style="stop-color:#06b6d4"/></linearGradient></defs>
+                            <defs><linearGradient id="ldsp-grad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#5070d0"/><stop offset="100%" style="stop-color:#5bb5a6"/></linearGradient></defs>
                             <circle class="ldsp-ring-bg" cx="${cfg.ringSize/2}" cy="${cfg.ringSize/2}" r="${r}"/>
                             <circle class="ldsp-ring-fill${anim ? ' anim' : ''}" cx="${cfg.ringSize/2}" cy="${cfg.ringSize/2}" r="${r}" stroke-dasharray="${circ}" stroke-dashoffset="${anim ? circ : off}" style="--circ:${circ};--off:${off}"/>
                         </svg>
@@ -2797,21 +3303,8 @@
             const lv = Utils.getReadingLevel(readingTime);
             const pct = Math.min(readingTime / 600 * 100, 100);
 
-            const changes = reqs.map(r => ({
-                name: Utils.simplifyName(r.name),
-                diff: r.currentValue - (todayData.startData[r.name] || 0)
-            })).filter(c => c.diff !== 0).sort((a, b) => b.diff - a.diff);
-
-            const pos = changes.filter(c => c.diff > 0).length;
-            const neg = changes.filter(c => c.diff < 0).length;
-
-            let changeHtml = changes.length > 0
-                ? `<div class="ldsp-chart"><div class="ldsp-chart-title">📊 今日变化明细</div><div class="ldsp-changes">${
-                    changes.map(c => `<div class="ldsp-chg-row"><span class="ldsp-chg-name">${c.name}</span><span class="ldsp-chg-val ${c.diff > 0 ? 'up' : 'down'}">${c.diff > 0 ? '+' : ''}${c.diff}</span></div>`).join('')
-                }</div></div>`
-                : `<div class="ldsp-no-chg">今日暂无数据变化</div>`;
-
-            return `
+            // 阅读时间基础信息（所有用户都可见）
+            let html = `
                 <div class="ldsp-time-info">今日 00:00 ~ ${nowStr} (首次记录于 ${startStr})</div>
                 <div class="ldsp-rd-stats">
                     <div class="ldsp-rd-stats-icon">${lv.icon}</div>
@@ -2821,41 +3314,66 @@
                 <div class="ldsp-rd-prog">
                     <div class="ldsp-rd-prog-hdr"><span class="ldsp-rd-prog-title">📖 阅读目标 (10小时)</span><span class="ldsp-rd-prog-val">${Math.round(pct)}%</span></div>
                     <div class="ldsp-rd-prog-bar"><div class="ldsp-rd-prog-fill" style="width:${pct}%;background:${lv.bg.replace('0.15', '1')}"></div></div>
-                </div>
+                </div>`;
+
+            // 升级要求变化明细（仅当有reqs时显示）
+            if (reqs && reqs.length > 0) {
+                const changes = reqs.map(r => ({
+                    name: Utils.simplifyName(r.name),
+                    diff: r.currentValue - (todayData.startData[r.name] || 0)
+                })).filter(c => c.diff !== 0).sort((a, b) => b.diff - a.diff);
+
+                const pos = changes.filter(c => c.diff > 0).length;
+                const neg = changes.filter(c => c.diff < 0).length;
+
+                html += `
                 <div class="ldsp-today-stats">
                     <div class="ldsp-today-stat"><div class="ldsp-today-stat-val">${pos}</div><div class="ldsp-today-stat-lbl">📈 增长项</div></div>
                     <div class="ldsp-today-stat"><div class="ldsp-today-stat-val">${neg}</div><div class="ldsp-today-stat-lbl">📉 下降项</div></div>
-                </div>
-                ${changeHtml}`;
+                </div>`;
+
+                if (changes.length > 0) {
+                    html += `<div class="ldsp-chart"><div class="ldsp-chart-title">📊 今日变化明细</div><div class="ldsp-changes">${
+                        changes.map(c => `<div class="ldsp-chg-row"><span class="ldsp-chg-name">${c.name}</span><span class="ldsp-chg-val ${c.diff > 0 ? 'up' : 'down'}">${c.diff > 0 ? '+' : ''}${c.diff}</span></div>`).join('')
+                    }</div></div>`;
+                } else {
+                    html += `<div class="ldsp-no-chg">今日暂无数据变化</div>`;
+                }
+            }
+
+            return html;
         }
 
         // 渲染周趋势
         renderWeekTrend(history, reqs, historyMgr, tracker) {
-            const weekAgo = Date.now() - 7 * 86400000;
-            const recent = history.filter(h => h.ts > weekAgo);
-            if (recent.length < 1) {
-                return `<div class="ldsp-empty"><div class="ldsp-empty-icon">📅</div><div class="ldsp-empty-txt">本周数据不足<br>每天访问积累数据</div></div>`;
-            }
-
+            // 阅读时间图表始终显示
             let html = this._renderWeekChart(tracker);
-            const daily = historyMgr.aggregateDaily(recent, reqs, 7);
-            const fields = this.getTrendFields(reqs);
-            const trends = [];
 
-            for (const f of fields) {
-                const data = this._calcDailyTrend(daily, f.name, 7);
-                if (data.values.some(v => v > 0)) {
-                    trends.push({ label: f.label, ...data, current: f.req.currentValue });
-                }
-            }
+            // 升级要求趋势（仅当有reqs时显示）
+            if (reqs && reqs.length > 0) {
+                const weekAgo = Date.now() - 7 * 86400000;
+                const recent = history.filter(h => h.ts > weekAgo);
+                if (recent.length >= 1) {
+                    const daily = historyMgr.aggregateDaily(recent, reqs, 7);
+                    const fields = this.getTrendFields(reqs);
+                    const trends = [];
 
-            if (trends.length > 0) {
-                html += `<div class="ldsp-chart"><div class="ldsp-chart-title">📈 本周每日增量<span class="ldsp-chart-sub">每日累积量</span></div>`;
-                html += this._renderSparkRows(trends);
-                if (trends[0].dates.length > 0) {
-                    html += `<div class="ldsp-date-labels">${trends[0].dates.map(d => `<span class="ldsp-date-lbl">${d}</span>`).join('')}</div>`;
+                    for (const f of fields) {
+                        const data = this._calcDailyTrend(daily, f.name, 7);
+                        if (data.values.some(v => v > 0)) {
+                            trends.push({ label: f.label, ...data, current: f.req.currentValue });
+                        }
+                    }
+
+                    if (trends.length > 0) {
+                        html += `<div class="ldsp-chart"><div class="ldsp-chart-title">📈 本周每日增量<span class="ldsp-chart-sub">每日累积量</span></div>`;
+                        html += this._renderSparkRows(trends);
+                        if (trends[0].dates.length > 0) {
+                            html += `<div class="ldsp-date-labels">${trends[0].dates.map(d => `<span class="ldsp-date-lbl">${d}</span>`).join('')}</div>`;
+                        }
+                        html += `</div>`;
+                    }
                 }
-                html += `</div>`;
             }
 
             return html;
@@ -2863,30 +3381,30 @@
 
         // 渲染月趋势
         renderMonthTrend(history, reqs, historyMgr, tracker) {
-            // 只要有数据就尝试显示
-            if (history.length < 1) {
-                return `<div class="ldsp-empty"><div class="ldsp-empty-icon">📊</div><div class="ldsp-empty-txt">本月数据不足<br>请继续访问积累数据</div></div>`;
-            }
-
+            // 阅读时间图表始终显示
             let html = this._renderMonthChart(tracker);
-            const weekly = historyMgr.aggregateWeekly(history, reqs);
-            const fields = this.getTrendFields(reqs);
-            const trends = [];
 
-            for (const f of fields) {
-                const data = this._calcWeeklyTrend(weekly, f.name);
-                if (data.values.length > 0) {
-                    trends.push({ label: f.label, ...data, current: f.req.currentValue });
-                }
-            }
+            // 升级要求趋势（仅当有reqs时显示）
+            if (reqs && reqs.length > 0 && history.length >= 1) {
+                const weekly = historyMgr.aggregateWeekly(history, reqs);
+                const fields = this.getTrendFields(reqs);
+                const trends = [];
 
-            if (trends.length > 0) {
-                html += `<div class="ldsp-chart"><div class="ldsp-chart-title">📈 本月每周增量<span class="ldsp-chart-sub">每周累积量</span></div>`;
-                html += this._renderSparkRows(trends, true);
-                if (trends[0].labels?.length > 0) {
-                    html += `<div class="ldsp-date-labels" style="padding-left:60px">${trends[0].labels.map(l => `<span class="ldsp-date-lbl">${l}</span>`).join('')}</div>`;
+                for (const f of fields) {
+                    const data = this._calcWeeklyTrend(weekly, f.name);
+                    if (data.values.length > 0) {
+                        trends.push({ label: f.label, ...data, current: f.req.currentValue });
+                    }
                 }
-                html += `</div>`;
+
+                if (trends.length > 0) {
+                    html += `<div class="ldsp-chart"><div class="ldsp-chart-title">📈 本月每周增量<span class="ldsp-chart-sub">每周累积量</span></div>`;
+                    html += this._renderSparkRows(trends, true);
+                    if (trends[0].labels?.length > 0) {
+                        html += `<div class="ldsp-date-labels" style="padding-left:60px">${trends[0].labels.map(l => `<span class="ldsp-date-lbl">${l}</span>`).join('')}</div>`;
+                    }
+                    html += `</div>`;
+                }
             }
 
             return html;
@@ -2894,33 +3412,35 @@
 
         // 渲染年趋势
         renderYearTrend(history, reqs, historyMgr, tracker) {
-            const yearAgo = Date.now() - 365 * 86400000;
-            const recent = history.filter(h => h.ts > yearAgo);
-            // 只要有数据就尝试显示
-            if (recent.length < 1) {
-                return `<div class="ldsp-empty"><div class="ldsp-empty-icon">📈</div><div class="ldsp-empty-txt">本年数据不足<br>请持续使用积累数据</div></div>`;
-            }
-
+            // 阅读热力图始终显示
             let html = this._renderYearChart(tracker);
-            const monthly = historyMgr.aggregateMonthly(recent, reqs);
-            const fields = this.getTrendFields(reqs);
-            const trends = [];
 
-            for (const f of fields) {
-                const data = this._calcMonthlyTrend(monthly, f.name);
-                if (data.values.some(v => v > 0)) {
-                    trends.push({ label: f.label, ...data, current: f.req.currentValue });
+            // 升级要求趋势（仅当有reqs时显示）
+            if (reqs && reqs.length > 0) {
+                const yearAgo = Date.now() - 365 * 86400000;
+                const recent = history.filter(h => h.ts > yearAgo);
+                if (recent.length >= 1) {
+                    const monthly = historyMgr.aggregateMonthly(recent, reqs);
+                    const fields = this.getTrendFields(reqs);
+                    const trends = [];
+
+                    for (const f of fields) {
+                        const data = this._calcMonthlyTrend(monthly, f.name);
+                        if (data.values.some(v => v > 0)) {
+                            trends.push({ label: f.label, ...data, current: f.req.currentValue });
+                        }
+                    }
+
+                    if (trends.length > 0) {
+                        html += `<div class="ldsp-chart"><div class="ldsp-chart-title">📊 本年每月增量<span class="ldsp-chart-sub">每月累积量</span></div>`;
+                        trends.forEach(t => {
+                            const max = Math.max(...t.values, 1);
+                            const bars = t.values.map((v, i) => `<div class="ldsp-spark-bar" style="height:${Math.max(v / max * 16, 2)}px" data-v="${v}" title="${i + 1}月: ${v}"></div>`).join('');
+                            html += `<div class="ldsp-spark-row"><span class="ldsp-spark-lbl">${t.label}</span><div class="ldsp-spark-bars" style="max-width:100%">${bars}</div><span class="ldsp-spark-val">${t.current}</span></div>`;
+                        });
+                        html += `</div>`;
+                    }
                 }
-            }
-
-            if (trends.length > 0) {
-                html += `<div class="ldsp-chart"><div class="ldsp-chart-title">📊 本年每月增量<span class="ldsp-chart-sub">每月累积量</span></div>`;
-                trends.forEach(t => {
-                    const max = Math.max(...t.values, 1);
-                    const bars = t.values.map((v, i) => `<div class="ldsp-spark-bar" style="height:${Math.max(v / max * 16, 2)}px" data-v="${v}" title="${i + 1}月: ${v}"></div>`).join('');
-                    html += `<div class="ldsp-spark-row"><span class="ldsp-spark-lbl">${t.label}</span><div class="ldsp-spark-bars" style="max-width:100%">${bars}</div><span class="ldsp-spark-val">${t.current}</span></div>`;
-                });
-                html += `</div>`;
             }
 
             return html;
@@ -2928,26 +3448,15 @@
 
         // 渲染全部趋势
         renderAllTrend(history, reqs, tracker) {
-            if (history.length < 1) {
-                return `<div class="ldsp-empty"><div class="ldsp-empty-icon">🌐</div><div class="ldsp-empty-txt">暂无历史数据<br>继续浏览，数据会自动记录</div></div>`;
-            }
-
-            const oldest = history[0], newest = history.at(-1);
-            // 计算记录天数（实际有数据的天数）
-            const recordDays = history.length;
-            // 计算跨度天数（从最早记录到现在的天数）
-            const spanDays = Math.ceil((Date.now() - oldest.ts) / 86400000);
-            
             const total = tracker.getTotalTime();
-            // 使用实际有阅读记录的天数来计算日均
             const readingData = tracker.storage.get('readingTime', null);
-            const actualReadingDays = readingData?.dailyData ? Object.keys(readingData.dailyData).length : recordDays;
+            const actualReadingDays = readingData?.dailyData ? Object.keys(readingData.dailyData).length : 1;
             const avg = Math.round(total / Math.max(actualReadingDays, 1));
             const lv = Utils.getReadingLevel(avg);
 
-            let html = `<div class="ldsp-time-info">共记录 <span>${recordDays}</span> 天数据${spanDays > recordDays ? ` · 跨度 ${spanDays} 天` : ''}</div>`;
+            // 阅读时间统计（始终显示）
+            let html = `<div class="ldsp-time-info">共记录 <span>${actualReadingDays}</span> 天阅读数据</div>`;
 
-            // 累计阅读时间统计
             if (total > 0) {
                 html += `<div class="ldsp-rd-stats">
                     <div class="ldsp-rd-stats-icon">📚</div>
@@ -2956,36 +3465,47 @@
                 </div>`;
             }
 
-            // 累计变化统计
-            const changes = reqs.map(r => ({
-                name: Utils.simplifyName(r.name),
-                diff: (newest.data[r.name] || 0) - (oldest.data[r.name] || 0),
-                current: r.currentValue,
-                required: r.requiredValue,
-                isSuccess: r.isSuccess
-            })).filter(c => c.diff !== 0 || c.current > 0);
+            // 升级要求统计（仅当有reqs和history时显示）
+            if (reqs && reqs.length > 0 && history.length >= 1) {
+                const oldest = history[0], newest = history.at(-1);
+                const recordDays = history.length;
+                const spanDays = Math.ceil((Date.now() - oldest.ts) / 86400000);
 
-            if (changes.length > 0) {
-                html += `<div class="ldsp-chart"><div class="ldsp-chart-title">📊 累计变化 <span style="font-size:9px;color:var(--txt-mut);font-weight:normal">(${recordDays}天)</span></div><div class="ldsp-changes">${
-                    changes.map(c => {
-                        const diffText = c.diff !== 0 ? `<span class="ldsp-chg-val ${c.diff > 0 ? 'up' : 'down'}">${c.diff > 0 ? '+' : ''}${c.diff}</span>` : '';
-                        return `<div class="ldsp-chg-row"><span class="ldsp-chg-name">${c.name}</span><span class="ldsp-chg-cur">${c.current}/${c.required}</span>${diffText}</div>`;
-                    }).join('')
-                }</div></div>`;
-            }
+                if (spanDays > actualReadingDays) {
+                    html = html.replace(`共记录 <span>${actualReadingDays}</span> 天阅读数据`, 
+                        `共记录 <span>${recordDays}</span> 天数据${spanDays > recordDays ? ` · 跨度 ${spanDays} 天` : ''}`);
+                }
 
-            // 如果有足够的历史数据，显示更多统计
-            if (recordDays >= 2) {
-                // 计算每日平均增量
-                const dailyAvgChanges = reqs.map(r => ({
+                // 累计变化统计
+                const changes = reqs.map(r => ({
                     name: Utils.simplifyName(r.name),
-                    avg: Math.round(((newest.data[r.name] || 0) - (oldest.data[r.name] || 0)) / Math.max(recordDays - 1, 1) * 10) / 10
-                })).filter(c => c.avg > 0);
+                    diff: (newest.data[r.name] || 0) - (oldest.data[r.name] || 0),
+                    current: r.currentValue,
+                    required: r.requiredValue,
+                    isSuccess: r.isSuccess
+                })).filter(c => c.diff !== 0 || c.current > 0);
 
-                if (dailyAvgChanges.length > 0) {
-                    html += `<div class="ldsp-chart"><div class="ldsp-chart-title">📈 日均增量</div><div class="ldsp-changes">${
-                        dailyAvgChanges.map(c => `<div class="ldsp-chg-row"><span class="ldsp-chg-name">${c.name}</span><span class="ldsp-chg-val up">+${c.avg}</span></div>`).join('')
+                if (changes.length > 0) {
+                    html += `<div class="ldsp-chart"><div class="ldsp-chart-title">📊 累计变化 <span style="font-size:9px;color:var(--txt-mut);font-weight:normal">(${recordDays}天)</span></div><div class="ldsp-changes">${
+                        changes.map(c => {
+                            const diffText = c.diff !== 0 ? `<span class="ldsp-chg-val ${c.diff > 0 ? 'up' : 'down'}">${c.diff > 0 ? '+' : ''}${c.diff}</span>` : '';
+                            return `<div class="ldsp-chg-row"><span class="ldsp-chg-name">${c.name}</span><span class="ldsp-chg-cur">${c.current}/${c.required}</span>${diffText}</div>`;
+                        }).join('')
                     }</div></div>`;
+                }
+
+                // 如果有足够的历史数据，显示更多统计
+                if (recordDays >= 2) {
+                    const dailyAvgChanges = reqs.map(r => ({
+                        name: Utils.simplifyName(r.name),
+                        avg: Math.round(((newest.data[r.name] || 0) - (oldest.data[r.name] || 0)) / Math.max(recordDays - 1, 1) * 10) / 10
+                    })).filter(c => c.avg > 0);
+
+                    if (dailyAvgChanges.length > 0) {
+                        html += `<div class="ldsp-chart"><div class="ldsp-chart-title">📈 日均增量</div><div class="ldsp-changes">${
+                            dailyAvgChanges.map(c => `<div class="ldsp-chg-row"><span class="ldsp-chg-name">${c.name}</span><span class="ldsp-chg-val up">+${c.avg}</span></div>`).join('')
+                        }</div></div>`;
+                    }
                 }
             }
 
@@ -3038,11 +3558,13 @@
             }
 
             const avg = currentDay > 0 ? Math.round(total / currentDay) : 0;
+            // 日期标签字号根据天数动态调整
+            const lblFontSize = daysInMonth >= 31 ? '7px' : (daysInMonth >= 28 ? '8px' : '9px');
             const bars = days.map(day => {
                 const h = max > 0 ? (day.mins > 0 ? Math.max(day.mins / max * 45, 2) : 1) : 1;
                 const op = day.isFuture ? 0.35 : (day.isToday ? 1 : 0.75);
                 const timeStr = day.isFuture ? '0分钟 (未到)' : Utils.formatReadingTime(day.mins);
-                return `<div class="ldsp-rd-day" style="margin:0 1px;flex:1;min-width:2px"><div class="ldsp-rd-day-bar" style="height:${h}px;opacity:${op};background:var(--accent2);width:100%;border-radius:3px 3px 0 0" data-t="${day.d}日: ${timeStr}"></div><div class="ldsp-rd-day-lbl" style="margin-top:3px">${day.d}</div></div>`;
+                return `<div class="ldsp-rd-day" style="margin:0 1px;flex:1;min-width:2px"><div class="ldsp-rd-day-bar" style="height:${h}px;opacity:${op};background:var(--accent2);width:100%;border-radius:3px 3px 0 0" data-t="${day.d}日: ${timeStr}"></div><div class="ldsp-rd-day-lbl" style="margin-top:3px;font-size:${lblFontSize}">${day.d}</div></div>`;
             }).join('');
 
             return `<div class="ldsp-chart"><div class="ldsp-chart-title">⏱️ 本月阅读时间<span class="ldsp-chart-sub">共 ${Utils.formatReadingTime(total)} · 日均 ${Utils.formatReadingTime(avg)}</span></div><div class="ldsp-rd-week" style="height:100px;align-items:flex-end;gap:1px">${bars}</div></div>`;
@@ -3113,7 +3635,7 @@
             });
 
             html += `</div><div class="ldsp-heatmap-legend"><span>&lt;1分</span>`;
-            for (let i = 0; i <= 4; i++) html += `<div class="ldsp-heatmap-legend-cell" style="background:${i === 0 ? 'rgba(124,58,237,.08)' : i === 4 ? 'var(--accent)' : `rgba(124,58,237,${0.1 + i * 0.15})`}"></div>`;
+            for (let i = 0; i <= 4; i++) html += `<div class="ldsp-heatmap-legend-cell" style="background:${i === 0 ? 'rgba(107,140,239,.1)' : i === 4 ? 'var(--accent)' : `rgba(107,140,239,${0.15 + i * 0.15})`}"></div>`;
             html += `<span>&gt;3小时</span></div></div></div>`;
 
             return html;
@@ -3240,12 +3762,13 @@
             }
 
             html += '<div class="ldsp-rank-list">';
+            const siteBaseUrl = `https://${CURRENT_SITE.domain}`;
             data.rankings.forEach((user, i) => {
                 const rank = i + 1;
                 const isMe = userId && user.user_id === userId;
                 const cls = [rank <= 3 ? `t${rank}` : '', isMe ? 'me' : ''].filter(Boolean).join(' ');
                 const icon = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank;
-                const avatar = user.avatar_url ? (user.avatar_url.startsWith('http') ? user.avatar_url : `https://linux.do${user.avatar_url}`) : '';
+                const avatar = user.avatar_url ? (user.avatar_url.startsWith('http') ? user.avatar_url : `${siteBaseUrl}${user.avatar_url}`) : '';
                 // XSS 防护：转义用户名和显示名称
                 const safeUsername = Utils.escapeHtml(Utils.sanitize(user.username, 30));
                 const safeName = Utils.escapeHtml(Utils.sanitize(user.name, 100));
@@ -3256,7 +3779,7 @@
 
                 html += `<div class="ldsp-rank-item ${cls}" style="animation-delay:${i * 30}ms">
                     <div class="ldsp-rank-num">${rank <= 3 ? icon : rank}</div>
-                    ${avatar ? `<img class="ldsp-rank-avatar" src="${avatar}" alt="${safeUsername}" onerror="this.style.display='none'">` : '<div class="ldsp-rank-avatar" style="display:flex;align-items:center;justify-content:center;font-size:12px">👤</div>'}
+                    ${avatar ? `<img class="ldsp-rank-avatar" src="${avatar}" alt="${safeUsername}" onerror="this.outerHTML='<div class=\\'ldsp-rank-avatar\\' style=\\'display:flex;align-items:center;justify-content:center;font-size:12px\\'>👤</div>'">` : '<div class="ldsp-rank-avatar" style="display:flex;align-items:center;justify-content:center;font-size:12px">👤</div>'}
                     <div class="ldsp-rank-info">${nameHtml}${isMe ? '<span class="ldsp-rank-me-tag">(我)</span>' : ''}</div>
                     <div class="ldsp-rank-time">${Utils.formatReadingTime(user.minutes)}</div>
                 </div>`;
@@ -3323,6 +3846,12 @@
             this._restore();
             this._fetchAvatar();
             this.fetch();
+
+            // 工单管理器初始化
+            if (this.hasLeaderboard && this.oauth) {
+                this.ticketManager = new TicketManager(this.oauth, this.$.panelBody);
+                this.ticketManager.init().catch(e => console.warn('[TicketManager] Init error:', e));
+            }
 
             // 云同步初始化
             if (this.hasLeaderboard) {
@@ -3399,7 +3928,7 @@
                         <button class="ldsp-cloud-sync" title="云同步" style="display:none">☁️</button>
                         <button class="ldsp-refresh" title="刷新数据">🔄</button>
                         <button class="ldsp-theme" title="切换主题">🌓</button>
-                        <button class="ldsp-toggle" title="折叠">◀</button>
+                        <button class="ldsp-toggle" title="折叠"><span class="ldsp-toggle-arrow">◀</span><svg class="ldsp-toggle-logo" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="ldsp-logo-grad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#8fa8f8"/><stop offset="100%" stop-color="#7ed4c4"/></linearGradient></defs><path d="M 31,4 A 28,28 0 1,1 11,52" fill="none" stroke="url(#ldsp-logo-grad)" stroke-width="8" stroke-linecap="round"/><rect x="25" y="26" width="12" height="12" rx="3" fill="url(#ldsp-logo-grad)" transform="rotate(45 31 32)"/></svg></button>
                     </div>
                 </div>
                 <div class="ldsp-update-bubble" style="display:none">
@@ -3416,12 +3945,19 @@
                         </div>
                     </div>
                     <div class="ldsp-user">
-                        <div class="ldsp-avatar-wrap"><div class="ldsp-avatar-ph">👤</div></div>
-                        <div class="ldsp-user-info">
-                            <div class="ldsp-user-display-name">加载中...</div>
-                            <div class="ldsp-user-handle"></div>
+                        <div class="ldsp-user-left">
+                            <div class="ldsp-user-row">
+                                <div class="ldsp-avatar-wrap" data-clickable><div class="ldsp-avatar-ph">👤</div></div>
+                                <div class="ldsp-user-info">
+                                    <div class="ldsp-user-display-name">加载中...</div>
+                                    <div class="ldsp-user-handle"></div>
+                                </div>
+                            </div>
+                            <div class="ldsp-user-actions">
+                                <div class="ldsp-action-btn ldsp-ticket-btn" data-clickable title="工单反馈"><span class="ldsp-action-icon">🎫</span><span class="ldsp-action-text">反馈工单</span></div>
+                            </div>
                         </div>
-                        <div class="ldsp-reading">
+                        <div class="ldsp-reading" data-clickable title="点击访问 LDStatus Pro 官网">
                             <div class="ldsp-reading-ripple"></div>
                             <span class="ldsp-reading-icon">🌱</span>
                             <span class="ldsp-reading-time">--</span>
@@ -3449,6 +3985,8 @@
                 user: this.el.querySelector('.ldsp-user'),
                 userDisplayName: this.el.querySelector('.ldsp-user-display-name'),
                 userHandle: this.el.querySelector('.ldsp-user-handle'),
+                ticketBtn: this.el.querySelector('.ldsp-ticket-btn'),
+                panelBody: this.el.querySelector('.ldsp-body'),
                 reading: this.el.querySelector('.ldsp-reading'),
                 readingIcon: this.el.querySelector('.ldsp-reading-icon'),
                 readingTime: this.el.querySelector('.ldsp-reading-time'),
@@ -3563,6 +4101,24 @@
                 }
             });
 
+            // 工单按钮
+            this.$.ticketBtn?.addEventListener('click', e => {
+                e.stopPropagation();
+                if (!this.hasLeaderboard || !this.oauth?.isLoggedIn()) {
+                    this.renderer.showToast('⚠️ 请先登录后使用工单功能');
+                    return;
+                }
+                if (this.ticketManager) {
+                    this.ticketManager.show();
+                }
+            });
+            
+            // 阅读卡片点击彩蛋 - 跳转到官网
+            this.$.reading?.addEventListener('click', e => {
+                e.stopPropagation();
+                window.open('https://ldspro.de5.net', '_blank');
+            });
+
             // 标签页切换
             this.$.tabs.forEach((tab, i) => {
                 tab.addEventListener('click', () => {
@@ -3608,7 +4164,8 @@
 
             if (this.storage.getGlobal('collapsed', false)) {
                 this.el.classList.add('collapsed');
-                this.$.btnToggle.textContent = '▶';
+                const arrow = this.$.btnToggle.querySelector('.ldsp-toggle-arrow');
+                if (arrow) arrow.textContent = '▶';
             }
 
             const theme = this.storage.getGlobal('theme', 'light');
@@ -3643,11 +4200,13 @@
 
             if (collapsing) {
                 if (this.el.classList.contains('expand-left')) this.el.style.left = (rect.right - 44) + 'px';
-                this.$.btnToggle.textContent = '▶';
+                const arrow = this.$.btnToggle.querySelector('.ldsp-toggle-arrow');
+                if (arrow) arrow.textContent = '▶';
             } else {
                 this._updateExpandDir();
                 if (this.el.classList.contains('expand-left')) this.el.style.left = Math.max(0, rect.left - (cfg.width - 44)) + 'px';
-                this.$.btnToggle.textContent = '◀';
+                const arrow = this.$.btnToggle.querySelector('.ldsp-toggle-arrow');
+                if (arrow) arrow.textContent = '◀';
                 this.animRing = true;
                 this.cachedReqs.length && setTimeout(() => this.renderer.renderReqs(this.cachedReqs), 100);
             }
@@ -3703,7 +4262,7 @@
 
             try {
                 const html = await this.network.fetch(CURRENT_SITE.apiUrl);
-                this._parse(html);
+                await this._parse(html);
             } catch (e) {
                 this._showError(e.message || '网络错误');
             } finally {
@@ -3715,7 +4274,37 @@
             this.$.reqs.innerHTML = `<div class="ldsp-empty"><div class="ldsp-empty-icon">❌</div><div class="ldsp-empty-txt">${msg}</div></div>`;
         }
 
-        _showLowTrustLevelWarning(username, level) {
+        // 更新信任等级到服务端和本地缓存
+        async _updateTrustLevel(connectLevel) {
+            if (!this.oauth?.isLoggedIn()) return;
+            
+            const userInfo = this.oauth.getUserInfo();
+            const currentLevel = userInfo?.trust_level;
+            
+            // 只有当等级变化时才更新
+            if (currentLevel === connectLevel) return;
+            
+            console.log(`[LDStatus Pro] Trust level change detected: ${currentLevel} -> ${connectLevel}`);
+            
+            try {
+                // 更新服务端
+                const result = await this.cloudSync?.oauth?.api('/api/user/trust-level', {
+                    method: 'POST',
+                    body: JSON.stringify({ trust_level: connectLevel })
+                });
+                
+                if (result?.success) {
+                    // 更新本地缓存
+                    const updatedUserInfo = { ...userInfo, trust_level: connectLevel };
+                    this.oauth.setUserInfo(updatedUserInfo);
+                    console.log(`[LDStatus Pro] Trust level synced to server: ${connectLevel}`);
+                }
+            } catch (e) {
+                console.warn('[LDStatus Pro] Failed to sync trust level:', e.message);
+            }
+        }
+
+        async _showLowTrustLevelWarning(username, level) {
             const $ = this.$;
             // 显示用户信息（如果有）
             if (username && username !== '未知') {
@@ -3723,40 +4312,367 @@
                 $.userHandle.textContent = '';
                 $.userHandle.style.display = 'none';
             }
+            
+            // 优先从 OAuth 用户信息获取信任等级（最准确）
+            let numLevel = parseInt(level) || 0;
+            if (this.oauth) {
+                const oauthUser = this.oauth.getUserInfo();
+                if (oauthUser && typeof oauthUser.trust_level === 'number') {
+                    numLevel = oauthUser.trust_level;
+                }
+            }
+            
+            // 尝试从 summary 页面获取统计数据
+            if (username && username !== '未知') {
+                this.$.reqs.innerHTML = `<div class="ldsp-loading"><div class="ldsp-spinner"></div><div>正在获取统计数据...</div></div>`;
+                const summaryData = await this._fetchSummaryData(username);
+                if (summaryData && Object.keys(summaryData).length > 0) {
+                    return this._renderSummaryData(summaryData, username, numLevel);
+                }
+            }
+            
+            // 如果无法获取 summary 数据，显示升级指引
+            let upgradeInfo = '';
+            
+            if (numLevel === 0) {
+                upgradeInfo = `
+                    <div style="margin-top:12px;padding:12px;background:rgba(107,140,239,0.1);border-radius:8px;text-align:left;">
+                        <div style="font-weight:600;margin-bottom:8px;color:#5a7de0;">📈 升级到等级1的要求：</div>
+                        <ul style="margin:0;padding-left:20px;font-size:12px;line-height:1.8;color:#4b5563;">
+                            <li>进入至少 <b>5</b> 个话题</li>
+                            <li>阅读至少 <b>30</b> 篇帖子</li>
+                            <li>总共花费 <b>10</b> 分钟阅读帖子</li>
+                        </ul>
+                    </div>`;
+            } else if (numLevel === 1) {
+                upgradeInfo = `
+                    <div style="margin-top:12px;padding:12px;background:rgba(107,140,239,0.1);border-radius:8px;text-align:left;">
+                        <div style="font-weight:600;margin-bottom:8px;color:#5a7de0;">📈 升级到等级2的要求：</div>
+                        <ul style="margin:0;padding-left:20px;font-size:12px;line-height:1.8;color:#4b5563;">
+                            <li>至少访问 <b>15</b> 天（不必连续）</li>
+                            <li>至少点赞 <b>1</b> 次</li>
+                            <li>至少收到 <b>1</b> 次点赞</li>
+                            <li>回复至少 <b>3</b> 个不同的话题</li>
+                            <li>进入至少 <b>20</b> 个话题</li>
+                            <li>阅读至少 <b>100</b> 篇帖子</li>
+                            <li>总共花费 <b>60</b> 分钟阅读帖子</li>
+                        </ul>
+                    </div>`;
+            }
+            
             // 显示友好的提示
             this.$.reqs.innerHTML = `
                 <div class="ldsp-empty">
                     <div class="ldsp-empty-icon">ℹ️</div>
                     <div class="ldsp-empty-txt">
-                        <div style="margin-bottom:8px;">信任等级小于2，暂无法获取升级要求</div>
-                        <div style="font-size:12px;color:#6b7280;">阅读时间追踪功能正常运行中</div>
+                        <div style="margin-bottom:8px;">当前信任等级：<b style="color:#5a7de0;">${numLevel}</b></div>
+                        <div style="font-size:12px;color:#6b7280;">达到等级2后可查看详细升级进度</div>
+                        ${upgradeInfo}
+                        <div style="margin-top:10px;font-size:11px;color:#9ca3af;">
+                            <a href="https://linux.do/t/topic/2460" target="_blank" style="color:#5a7de0;text-decoration:none;">📖 查看完整信任等级说明</a>
+                        </div>
                     </div>
                 </div>`;
+            
+            // 初始化 todayData（用于今日趋势显示）
+            const todayData = this._getTodayData();
+            if (!todayData) {
+                this._setTodayData({}, true);
+            }
+            
+            // 低信任等级用户也可以查看阅读时间趋势
+            const history = this.historyMgr.getHistory();
+            this.cachedHistory = history;
+            this.cachedReqs = []; // 空的升级要求数组
+            this._renderTrends(history, []);
         }
-
-        _parse(html) {
+        
+        /**
+         * 从 summary.json API 获取用户统计数据 (使用 user_summary 字段)
+         * @param {string} username - 用户名
+         * @returns {Object|null} - 统计数据对象或null
+         */
+        async _fetchSummaryData(username) {
+            try {
+                const baseUrl = `https://${CURRENT_SITE.domain}`;
+                const data = {};
+                
+                // 优先使用 summary.json API（Discourse 标准 API）的 user_summary 字段
+                const jsonUrl = `${baseUrl}/u/${encodeURIComponent(username)}/summary.json`;
+                try {
+                    // 使用 GM_xmlhttpRequest 以支持跨域和 cookie
+                    const jsonText = await this.network.fetch(jsonUrl, { maxRetries: 2, timeout: 10000 });
+                    if (jsonText) {
+                        const json = JSON.parse(jsonText);
+                        
+                        // 从 user_summary 字段提取统计数据
+                        const stats = json?.user_summary;
+                        if (stats) {
+                            // 映射 Discourse API 字段到显示名称
+                            if (stats.days_visited !== undefined) data['访问天数'] = stats.days_visited;
+                            if (stats.topics_entered !== undefined) data['浏览话题'] = stats.topics_entered;
+                            if (stats.posts_read_count !== undefined) data['已读帖子'] = stats.posts_read_count;
+                            if (stats.likes_given !== undefined) data['送出赞'] = stats.likes_given;
+                            if (stats.likes_received !== undefined) data['获赞'] = stats.likes_received;
+                            if (stats.post_count !== undefined) data['回复'] = stats.post_count;
+                            if (stats.topic_count !== undefined) data['创建话题'] = stats.topic_count;
+                            // 额外有用的字段
+                            if (stats.time_read !== undefined) data['阅读时间'] = Math.round(stats.time_read / 60); // 秒转分钟
+                            
+                            if (Object.keys(data).length > 0) {
+                                console.log('[LDStatus Pro] Summary data from JSON API:', data);
+                                return data;
+                            }
+                        }
+                    }
+                } catch (jsonErr) {
+                    console.warn('[LDStatus Pro] JSON API failed:', jsonErr.message);
+                    // JSON API 失败，继续尝试 HTML 解析
+                }
+                
+                // 方法B：回退到 HTML 解析
+                const url = `${baseUrl}/u/${encodeURIComponent(username)}/summary`;
+                const html = await this.network.fetch(url, { maxRetries: 2 });
+                if (!html) return null;
+                
+                const doc = new DOMParser().parseFromString(html, 'text/html');
+                
+                // 辅助函数：解析数值（支持 k、m 等缩写和逗号分隔）
+                const parseValue = (text) => {
+                    if (!text) return 0;
+                    const cleaned = text.replace(/,/g, '').trim();
+                    const match = cleaned.match(/([\d.]+)\s*([km万亿])?/i);
+                    if (!match) return 0;
+                    let value = parseFloat(match[1]);
+                    const suffix = match[2]?.toLowerCase();
+                    if (suffix === 'k' || suffix === '万') value *= 1000;
+                    if (suffix === 'm' || suffix === '亿') value *= 1000000;
+                    return Math.round(value);
+                };
+                
+                // 方法1：通过 class 名称查找统计项（Discourse 标准结构）
+                const statItems = doc.querySelectorAll('li[class*="stats-"], .stat-item, .user-stat');
+                statItems.forEach(item => {
+                    const className = item.className || '';
+                    const valueEl = item.querySelector('.value .number, .value, .stat-value');
+                    if (!valueEl) return;
+                    
+                    // 优先从 title 获取完整数值
+                    let value = 0;
+                    const titleAttr = valueEl.getAttribute('title') || item.getAttribute('title');
+                    if (titleAttr) {
+                        value = parseValue(titleAttr);
+                    } else {
+                        value = parseValue(valueEl.textContent);
+                    }
+                    
+                    // 根据 class 名称映射
+                    if (className.includes('days-visited')) data['访问天数'] = value;
+                    else if (className.includes('topics-entered')) data['浏览话题'] = value;
+                    else if (className.includes('posts-read')) data['已读帖子'] = value;
+                    else if (className.includes('likes-given')) data['送出赞'] = value;
+                    else if (className.includes('likes-received')) data['获赞'] = value;
+                    else if (className.includes('post-count')) data['回复'] = value;
+                    else if (className.includes('topic-count')) data['创建话题'] = value;
+                    else if (className.includes('solved-count')) data['解决方案'] = value;
+                });
+                
+                // 方法2：如果方法1没找到数据，尝试通过标签文本匹配
+                if (Object.keys(data).length === 0) {
+                    // 查找所有可能包含统计数据的元素
+                    const allStats = doc.querySelectorAll('.stats-section li, .top-section li, .user-summary-stat');
+                    allStats.forEach(item => {
+                        const text = item.textContent.trim();
+                        const labelEl = item.querySelector('.label, .stat-label');
+                        const valueEl = item.querySelector('.value, .number, .stat-value');
+                        
+                        if (!labelEl && !valueEl) return;
+                        
+                        const label = (labelEl?.textContent || '').toLowerCase().trim();
+                        let value = 0;
+                        
+                        if (valueEl) {
+                            const titleAttr = valueEl.getAttribute('title') || item.getAttribute('title');
+                            value = parseValue(titleAttr || valueEl.textContent);
+                        }
+                        
+                        // 根据标签文本匹配
+                        if (label.includes('访问') || label.includes('visited') || text.includes('访问天数')) {
+                            data['访问天数'] = value;
+                        } else if (label.includes('浏览') && label.includes('话题') || label.includes('topics') || text.includes('浏览的话题')) {
+                            data['浏览话题'] = value;
+                        } else if (label.includes('已读') || label.includes('阅读') || label.includes('posts read') || text.includes('已读帖子')) {
+                            data['已读帖子'] = value;
+                        } else if (label.includes('送出') || label.includes('given') || text.includes('已送出')) {
+                            data['送出赞'] = value;
+                        } else if (label.includes('收到') || label.includes('received') || text.includes('已收到')) {
+                            data['获赞'] = value;
+                        } else if (label.includes('帖子') && !label.includes('已读') || label.includes('创建的帖子') || text.includes('创建的帖子')) {
+                            data['回复'] = value;
+                        } else if (label.includes('创建') && label.includes('话题') || text.includes('创建的话题')) {
+                            data['创建话题'] = value;
+                        }
+                    });
+                }
+                
+                // 方法3：通用文本解析（作为最后手段）
+                if (Object.keys(data).length === 0) {
+                    const statsText = doc.body?.textContent || '';
+                    // 尝试匹配 "数字+标签" 的模式
+                    const patterns = [
+                        { regex: /([\d,.]+[km]?)\s*访问天数/i, key: '访问天数' },
+                        { regex: /([\d,.]+[km]?)\s*浏览的?话题/i, key: '浏览话题' },
+                        { regex: /([\d,.]+[km]?)\s*已读帖子/i, key: '已读帖子' },
+                        { regex: /([\d,.]+[km]?)\s*已?送出/i, key: '送出赞' },
+                        { regex: /([\d,.]+[km]?)\s*已?收到/i, key: '获赞' },
+                        { regex: /([\d,.]+[km]?)\s*创建的帖子/i, key: '回复' }
+                    ];
+                    patterns.forEach(p => {
+                        const match = statsText.match(p.regex);
+                        if (match) data[p.key] = parseValue(match[1]);
+                    });
+                }
+                
+                return Object.keys(data).length > 0 ? data : null;
+            } catch (e) {
+                console.warn('[LDStatus Pro] Failed to fetch summary data:', e.message);
+                return null;
+            }
+        }
+        
+        /**
+         * 渲染 summary 统计数据（低信任等级用户）
+         * 使用与 2 级用户相同的 renderReqs 方法显示进度
+         */
+        _renderSummaryData(data, username, level) {
+            // 构建要求数据结构（用于显示和趋势）
+            const reqs = [];
+            
+            // 根据 Discourse 官方升级要求配置
+            // 0→1: 进入5个话题、阅读30篇帖子、花费10分钟阅读（阅读时间无法从summary获取，不显示）
+            // 1→2: 访问15天、点赞1次、获赞1次、回复3个话题、进入20个话题、阅读100篇帖子、花费60分钟阅读
+            const statsConfig = level === 0 ? [
+                // 0级升1级要求
+                { key: '浏览话题', required: 5 },
+                { key: '已读帖子', required: 30 }
+            ] : [
+                // 1级升2级要求
+                { key: '访问天数', required: 15 },
+                { key: '浏览话题', required: 20 },
+                { key: '已读帖子', required: 100 },
+                { key: '送出赞', required: 1 },
+                { key: '获赞', required: 1 },
+                { key: '回复', required: 3 }
+            ];
+            
+            statsConfig.forEach(config => {
+                // 获取当前值（如果没有数据则默认为 0）
+                const currentValue = data[config.key] !== undefined ? data[config.key] : 0;
+                const requiredValue = config.required;
+                const isSuccess = currentValue >= requiredValue;
+                const prev = this.prevReqs.find(p => p.name === config.key);
+                
+                reqs.push({
+                    name: config.key,
+                    currentValue,
+                    requiredValue,
+                    isSuccess,
+                    change: prev ? currentValue - prev.currentValue : 0,
+                    isReverse: false
+                });
+            });
+            
+            // 如果没有任何配置项，返回 false
+            if (reqs.length === 0) return false;
+            
+            // 检查升级条件
+            const requiredItems = reqs.filter(r => r.requiredValue > 0);
+            const metItems = requiredItems.filter(r => r.isSuccess);
+            const isOK = requiredItems.length > 0 && metItems.length === requiredItems.length;
+            
+            // 通知检查
+            this.notifier.check(reqs);
+            
+            // 保存历史数据
+            const histData = {};
+            reqs.forEach(r => histData[r.name] = r.currentValue);
+            const history = this.historyMgr.addHistory(histData, this.readingTime);
+            
+            // 保存今日数据
+            const todayData = this._getTodayData();
+            this._setTodayData(histData, !todayData);
+            
+            // 获取 OAuth 用户信息中的显示名称
+            let displayName = null;
+            if (this.hasLeaderboard && this.oauth?.isLoggedIn()) {
+                const oauthUser = this.oauth.getUserInfo();
+                if (oauthUser?.name && oauthUser.name !== oauthUser.username) {
+                    displayName = oauthUser.name;
+                }
+            }
+            
+            // 渲染用户信息和统计数据（与 2 级用户使用相同的 renderReqs 方法）
+            this.renderer.renderUser(username, level.toString(), isOK, reqs, displayName);
+            this.renderer.renderReqs(reqs, level);
+            
+            // 保存缓存
+            this.cachedHistory = history;
+            this.cachedReqs = reqs;
+            this.prevReqs = reqs;
+            
+            // 0-1级用户也触发数据同步（阅读时间等）
+            if (this.hasLeaderboard && this.cloudSync && this.oauth?.isLoggedIn()) {
+                // 同步阅读时间数据
+                this.cloudSync.upload().catch(() => {});
+            }
+            
+            // 渲染趋势
+            this._renderTrends(history, reqs);
+            
+            return true;
+        }
+        
+        async _parse(html) {
             const doc = new DOMParser().parseFromString(html, 'text/html');
             
             // 尝试获取用户名（即使没有升级要求数据也可能有用户信息）
-            const userSection = doc.querySelector('.bg-white.p-6.rounded-lg');
             const avatarEl = doc.querySelector('img[src*="avatar"]');
             
-            // 尝试从页面提取用户名
+            // 尝试从页面提取用户名和信任等级
             let username = null;
             let level = '?';
+            let connectLevel = null;  // 从 connect 页面获取的等级（最新）
             
-            // 先尝试从头像 alt 或其他元素获取用户名
-            if (avatarEl?.alt) {
+            // 1. 优先从 h1 标签获取等级信息: "你好，昵称 (username) X级用户"
+            const h1El = doc.querySelector('h1');
+            if (h1El) {
+                const h1Text = h1El.textContent;
+                const h1Match = h1Text.match(PATTERNS.TRUST_LEVEL_H1);
+                if (h1Match) {
+                    username = h1Match[1];  // 括号内的 username
+                    connectLevel = parseInt(h1Match[2]) || 0;
+                    level = connectLevel.toString();
+                }
+            }
+            
+            // 2. 从头像 alt 获取用户名（备用）
+            if (!username && avatarEl?.alt) {
                 username = avatarEl.alt;
             }
             
-            // 查找包含信任级别的区块
+            // 3. 查找包含信任级别的区块获取更多信息
             const section = [...doc.querySelectorAll('.bg-white.p-6.rounded-lg')].find(d => d.querySelector('h2')?.textContent.includes('信任级别'));
             
             if (section) {
                 const heading = section.querySelector('h2').textContent;
-                const match = heading.match(PATTERNS.TRUST_LEVEL) || ['', '未知', '?'];
-                [, username, level] = match;
+                const match = heading.match(PATTERNS.TRUST_LEVEL);
+                if (match) {
+                    if (!username) username = match[1];
+                    if (connectLevel === null) {
+                        connectLevel = parseInt(match[2]) || 0;
+                        level = match[2];
+                    }
+                }
             }
             
             // 无论是否有升级要求，只要能识别用户就初始化阅读追踪
@@ -3776,9 +4692,14 @@
             this.readingTime = this.tracker.getTodayTime();
             this.renderer.renderReading(this.readingTime, this.tracker.isActive);
             
-            // 如果没有升级要求数据（信任等级 < 2），显示提示但不阻止其他功能
+            // 如果用户已登录，且从 connect 获取到了等级信息，更新本地缓存和服务端
+            if (connectLevel !== null && this.oauth?.isLoggedIn()) {
+                this._updateTrustLevel(connectLevel);
+            }
+            
+            // 如果没有升级要求数据（信任等级 < 2），尝试从 summary 页面获取统计数据
             if (!section) {
-                return this._showLowTrustLevelWarning(username, level);
+                return await this._showLowTrustLevelWarning(username, level);
             }
 
             const rows = section.querySelectorAll('table tr');
@@ -3883,6 +4804,13 @@
                 requestAnimationFrame(() => {
                     setTimeout(() => {
                         container.innerHTML = this.renderer.renderYearTrend(history, reqs, this.historyMgr, this.tracker);
+                        // 自动滚动热力图到today位置（底部）
+                        const heatmap = container.querySelector('.ldsp-year-heatmap');
+                        if (heatmap) {
+                            requestAnimationFrame(() => {
+                                heatmap.scrollTop = heatmap.scrollHeight;
+                            });
+                        }
                     }, 50);
                 });
                 return;
@@ -3929,50 +4857,118 @@
                 
                 // 处理可能的双重嵌套: result.data.data 或 result.data
                 const announcement = result.data.data || result.data;
-                if (!announcement.enabled || !announcement.content) {
+                if (!announcement.enabled) return;
+                
+                // v3.3.3: 支持多条公告 - 兼容旧版单条公告格式
+                let items = [];
+                if (Array.isArray(announcement.items) && announcement.items.length > 0) {
+                    items = announcement.items;
+                } else if (announcement.content) {
+                    // 兼容旧版单条公告格式
+                    items = [{
+                        content: announcement.content,
+                        type: announcement.type || 'info',
+                        expiresAt: announcement.expiresAt || null
+                    }];
+                }
+                
+                // 过滤已过期的公告
+                const now = Date.now();
+                items = items.filter(item => !item.expiresAt || item.expiresAt > now);
+                
+                if (items.length === 0) {
+                    console.log('[Announcement] No valid announcements');
                     return;
                 }
                 
-                // 检查公告有效期（北京时间）
-                if (announcement.expiresAt) {
-                    const now = Date.now();
-                    if (now > announcement.expiresAt) {
-                        console.log('[Announcement] Expired');
-                        return;
-                    }
-                }
-                
                 // 显示公告
-                this._showAnnouncement(announcement);
+                this._showAnnouncements(items);
             } catch (e) {
                 console.warn('[Announcement] Load failed:', e.message);
             }
         }
 
         /**
-         * 显示公告栏
+         * 显示多条公告轮播
+         * @param {Array} items - 公告数组 [{content, type, expiresAt}, ...]
          */
-        _showAnnouncement(announcement) {
+        _showAnnouncements(items) {
             if (!this.$.announcement || !this.$.announcementText) return;
             
-            // 设置公告类型样式
-            this.$.announcement.className = 'ldsp-announcement';
-            if (announcement.type && announcement.type !== 'info') {
-                this.$.announcement.classList.add(announcement.type);
+            // 清除之前的轮播定时器
+            if (this._announcementTimer) {
+                clearTimeout(this._announcementTimer);
+                this._announcementTimer = null;
             }
             
-            // 设置公告内容
-            this.$.announcementText.textContent = announcement.content;
+            this._announcementItems = items;
+            this._announcementIndex = 0;
             
-            // 根据文字长度设置滚动速度
-            const textLength = announcement.content.length;
-            const duration = Math.max(10, Math.min(30, textLength * 0.3)); // 10-30秒
-            this.$.announcement.style.setProperty('--marquee-duration', `${duration}s`);
+            // 显示第一条公告
+            this._displayCurrentAnnouncement();
             
             // 显示公告栏
             requestAnimationFrame(() => {
                 this.$.announcement.classList.add('active');
             });
+        }
+        
+        /**
+         * 安排下一条公告的切换（使用动画结束事件）
+         */
+        _scheduleNextAnnouncement() {
+            if (this._announcementItems.length <= 1) return;
+            
+            const inner = this.$.announcement.querySelector('.ldsp-announcement-inner');
+            if (!inner) return;
+            
+            // 移除旧的监听器
+            if (this._announcementEndHandler) {
+                inner.removeEventListener('animationend', this._announcementEndHandler);
+            }
+            
+            // 添加新的动画结束监听器
+            this._announcementEndHandler = () => {
+                this._announcementIndex = (this._announcementIndex + 1) % this._announcementItems.length;
+                this._displayCurrentAnnouncement();
+            };
+            inner.addEventListener('animationend', this._announcementEndHandler, { once: true });
+        }
+        
+        /**
+         * 显示当前索引的公告
+         */
+        _displayCurrentAnnouncement() {
+            const item = this._announcementItems[this._announcementIndex];
+            if (!item) return;
+            
+            // 设置公告类型样式
+            this.$.announcement.className = 'ldsp-announcement active';
+            if (item.type && item.type !== 'info') {
+                this.$.announcement.classList.add(item.type);
+            }
+            
+            // 设置公告内容（带序号，如果多条）
+            const prefix = this._announcementItems.length > 1 
+                ? `[${this._announcementIndex + 1}/${this._announcementItems.length}] ` 
+                : '';
+            this.$.announcementText.textContent = prefix + item.content;
+            
+            // 根据文字长度设置滚动速度
+            const textLength = (prefix + item.content).length;
+            const duration = Math.max(10, Math.min(30, textLength * 0.3));
+            this.$.announcement.style.setProperty('--marquee-duration', `${duration}s`);
+            
+            // 重置动画
+            const inner = this.$.announcement.querySelector('.ldsp-announcement-inner');
+            if (inner) {
+                inner.style.animation = 'none';
+                inner.offsetHeight; // 触发重排
+                inner.style.animation = '';
+            }
+            
+            // 安排下一条公告切换
+            this._scheduleNextAnnouncement();
         }
 
         async _checkUpdate(autoCheck = false) {
