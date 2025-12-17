@@ -1,7 +1,7 @@
 ﻿// ==UserScript==
 // @name         LDStatus Pro
 // @namespace    http://tampermonkey.net/
-// @version      3.4.5
+// @version      3.4.6
 // @description  在 Linux.do 和 IDCFlare 页面显示信任级别进度，支持历史趋势、里程碑通知、阅读时间统计、排行榜系统。两站点均支持排行榜和云同步功能
 // @author       JackLiii
 // @license      MIT
@@ -2324,9 +2324,9 @@
 #ldsp-panel.collapsed .ldsp-toggle .ldsp-toggle-arrow{display:none}
 #ldsp-panel.collapsed .ldsp-toggle .ldsp-toggle-logo{display:block;width:24px;height:24px;filter:brightness(1.05) drop-shadow(0 0 2px rgba(140,180,255,.2));transition:filter .2s var(--ease),transform .2s var(--ease)}
 #ldsp-panel:not(.collapsed) .ldsp-toggle .ldsp-toggle-logo{display:none}
-#ldsp-panel.collapsed:hover{transform:scale(1.08);box-shadow:var(--shadow-lg),0 0 35px rgba(120,160,255,.6)}
-#ldsp-panel.collapsed:hover .ldsp-toggle-logo{filter:brightness(1.6) drop-shadow(0 0 12px rgba(160,200,255,1)) drop-shadow(0 0 20px rgba(140,180,255,.8));transform:scale(1.15) rotate(360deg);transition:filter .3s var(--ease),transform .6s var(--ease-spring)}
+@media (hover:hover){#ldsp-panel.collapsed:hover{transform:scale(1.08);box-shadow:var(--shadow-lg),0 0 35px rgba(120,160,255,.6)}#ldsp-panel.collapsed:hover .ldsp-toggle-logo{filter:brightness(1.6) drop-shadow(0 0 12px rgba(160,200,255,1)) drop-shadow(0 0 20px rgba(140,180,255,.8));transform:scale(1.15) rotate(360deg);transition:filter .3s var(--ease),transform .6s var(--ease-spring)}}
 #ldsp-panel.collapsed:active .ldsp-toggle-logo{filter:brightness(2) drop-shadow(0 0 16px rgba(200,230,255,1)) drop-shadow(0 0 30px rgba(160,200,255,1));transform:scale(0.92)}
+#ldsp-panel.collapsed.no-hover-effect{transform:none!important}#ldsp-panel.collapsed.no-hover-effect .ldsp-toggle-logo{filter:brightness(1.05) drop-shadow(0 0 2px rgba(140,180,255,.2))!important;transform:none!important}
 .ldsp-hdr{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--grad);cursor:move;user-select:none;touch-action:none;position:relative;gap:8px}
 .ldsp-hdr::before{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.1) 0%,transparent 100%);pointer-events:none}
 .ldsp-hdr::after{content:'';position:absolute;top:-50%;left:-50%;width:200%;height:200%;background:radial-gradient(circle,rgba(255,255,255,.1) 0%,transparent 60%);opacity:0;transition:opacity .5s;pointer-events:none}
@@ -4200,10 +4200,16 @@
             document.addEventListener('touchmove', updateDrag, { passive: false });
             document.addEventListener('touchend', e => {
                 const wasDragging = dragging;
+                const isCollapsed = this.el.classList.contains('collapsed');
                 endDrag();
                 // 触摸未移动且是折叠状态，视为点击展开
-                if (wasDragging && !moved && this.el.classList.contains('collapsed')) {
+                if (wasDragging && !moved && isCollapsed) {
                     this._toggle();
+                }
+                // 移动端：清除折叠 logo 的 hover 残留效果
+                if (isCollapsed && wasDragging) {
+                    this.el.classList.add('no-hover-effect');
+                    setTimeout(() => this.el.classList.remove('no-hover-effect'), 50);
                 }
             });
 
@@ -4230,9 +4236,10 @@
                 }
             });
             
-            // 点击 site-icon 退出登录
+            // 点击 site-icon 退出登录（同时支持 click 和 touchend）
             this.$.siteIcon = this.el.querySelector('.ldsp-site-icon');
-            this.$.siteIcon?.addEventListener('click', e => {
+            const handleSiteIconClick = (e) => {
+                e.preventDefault();
                 e.stopPropagation();
                 if (!this.hasLeaderboard || !this.oauth?.isLoggedIn()) {
                     this.renderer.showToast('ℹ️ 当前未登录');
@@ -4245,6 +4252,17 @@
                     this.renderer.showToast('✅ 已退出登录');
                     this._updateLoginUI();
                     this._renderLeaderboard();
+                }
+            };
+            this.$.siteIcon?.addEventListener('click', handleSiteIconClick);
+            // Safari 移动端需要 touchend 事件
+            let siteIconTouchMoved = false;
+            this.$.siteIcon?.addEventListener('touchstart', () => { siteIconTouchMoved = false; }, { passive: true });
+            this.$.siteIcon?.addEventListener('touchmove', () => { siteIconTouchMoved = true; }, { passive: true });
+            this.$.siteIcon?.addEventListener('touchend', (e) => {
+                if (!siteIconTouchMoved) {
+                    e.preventDefault();
+                    handleSiteIconClick(e);
                 }
             });
             
@@ -5327,7 +5345,15 @@
                 
                 this._updateLoginUI();
                 await this._syncPrefs();
-                this.cloudSync.fullSync().catch(e => console.warn('[CloudSync]', e));
+                
+                // 登录成功后重新获取 connect 页面数据（此时 OAuth 用户信息已设置，可以正确显示信任等级）
+                this.fetch();
+                
+                // 首次登录后的完整同步：阅读数据 + 要求数据
+                this.cloudSync.fullSync().then(() => {
+                    // 阅读数据同步完成后，同步要求数据（信任等级进度）
+                    return this.cloudSync.syncRequirementsOnLoad();
+                }).catch(e => console.warn('[CloudSync]', e));
             } catch (e) {
                 console.error('[OAuth] Handle pending login error:', e);
             }
