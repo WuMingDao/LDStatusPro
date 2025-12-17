@@ -1,7 +1,7 @@
 ﻿// ==UserScript==
 // @name         LDStatus Pro
 // @namespace    http://tampermonkey.net/
-// @version      3.4.8.2
+// @version      3.4.8.3
 // @description  在 Linux.do 和 IDCFlare 页面显示信任级别进度，支持历史趋势、里程碑通知、阅读时间统计、排行榜系统。两站点均支持排行榜和云同步功能
 // @author       JackLiii
 // @license      MIT
@@ -790,11 +790,16 @@
                     });
                     return result;
                 } catch (gmError) {
-                    // 继续尝试 native fetch
+                    // 跨域请求不使用 native fetch fallback（会触发 CORS 错误）
+                    const isCrossOrigin = !url.startsWith(location.origin);
+                    if (isCrossOrigin) {
+                        throw gmError;  // 直接抛出错误，不 fallback
+                    }
+                    // 同源请求继续尝试 native fetch
                 }
             }
             
-            // 方法2: native fetch 作为 fallback（跨域可能失败）
+            // 方法2: native fetch 作为 fallback（仅同源请求）
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), timeout);
             const resp = await fetch(url, { 
