@@ -1,7 +1,7 @@
 ﻿// ==UserScript==
 // @name         LDStatus Pro
 // @namespace    http://tampermonkey.net/
-// @version      3.4.8.9
+// @version      3.4.9.0
 // @description  在 Linux.do 和 IDCFlare 页面显示信任级别进度，支持历史趋势、里程碑通知、阅读时间统计、排行榜系统。两站点均支持排行榜和云同步功能
 // @author       JackLiii
 // @license      MIT
@@ -183,6 +183,31 @@
         _tryBecomeLeader() {
             const now = Date.now();
             let data = {};
+            
+            // 检查 localStorage 是否可用（隐私模式、存储满等情况）
+            if (!this._storageAvailable) {
+                if (this._storageAvailable === undefined) {
+                    try {
+                        const testKey = '__ldsp_test__';
+                        localStorage.setItem(testKey, '1');
+                        localStorage.removeItem(testKey);
+                        this._storageAvailable = true;
+                    } catch (e) {
+                        this._storageAvailable = false;
+                        Logger.log('localStorage not available, becoming sole leader');
+                    }
+                }
+                // localStorage 不可用，直接成为领导者
+                if (!this._storageAvailable) {
+                    if (!this._isLeader) {
+                        this._isLeader = true;
+                        this._notifyCallbacks(true);
+                        EventBus.emit('leader:change', { isLeader: true, tabId: this._tabId });
+                    }
+                    return;
+                }
+            }
+            
             try {
                 const stored = localStorage.getItem(this.LEADER_KEY);
                 if (stored) data = JSON.parse(stored);
@@ -1334,47 +1359,76 @@
         }
 
         _bindEvents() {
-            // 使用节流的活动处理器
-            // 普通事件：每秒最多触发一次
-            this._activityHandler = Utils.throttle(() => this._onActivity(), 1000);
-            // 高频事件（如 mousemove）：每 3 秒最多触发一次
-            this._highFreqHandler = Utils.throttle(() => this._onActivity(), 3000);
-            
-            // 监听用户活动事件
-            // 普通频率事件：点击、按键、触摸开始
-            ['mousedown', 'keydown', 'click', 'touchstart', 'pointerdown'].forEach(e => {
-                document.addEventListener(e, this._activityHandler, { passive: true, capture: false });
-            });
-            
-            // 高频事件：移动、滚动（使用更长的节流时间）
-            ['mousemove', 'scroll', 'wheel', 'touchmove', 'pointermove'].forEach(e => {
-                document.addEventListener(e, this._highFreqHandler, { passive: true, capture: false });
-            });
+            try {
+                // 使用节流的活动处理器
+                // 普通事件：每秒最多触发一次
+                this._activityHandler = Utils.throttle(() => this._onActivity(), 1000);
+                // 高频事件（如 mousemove）：每 3 秒最多触发一次
+                this._highFreqHandler = Utils.throttle(() => this._onActivity(), 3000);
+                
+                // 监听用户活动事件
+                // 使用 capture: true 确保在事件捕获阶段就能获取，避免被其他脚本阻止
+                // 普通频率事件：点击、按键、触摸开始
+                this._normalEvents = ['mousedown', 'keydown', 'click', 'touchstart', 'pointerdown'];
+                this._normalEvents.forEach(e => {
+                    document.addEventListener(e, this._activityHandler, { passive: true, capture: true });
+                });
+                
+                // 高频事件：移动、滚动（使用更长的节流时间）
+                this._highFreqEvents = ['mousemove', 'scroll', 'wheel', 'touchmove', 'pointermove'];
+                this._highFreqEvents.forEach(e => {
+                    document.addEventListener(e, this._highFreqHandler, { passive: true, capture: true });
+                });
 
-            // 页面可见性变化
-            this._visibilityHandler = () => {
-                if (document.hidden) {
-                    this.save();
-                    this.isActive = false;
-                } else {
-                    // 页面恢复可见时，假定用户正在查看，恢复活动状态
-                    // 如果用户60秒内无任何操作，定时器会自动设为 inactive
+                // 页面可见性变化
+                this._visibilityHandler = () => {
+                    if (document.hidden) {
+                        this.save();
+                        this.isActive = false;
+                    } else {
+                        // 页面恢复可见时，假定用户正在查看，恢复活动状态
+                        // 如果用户60秒内无任何操作，定时器会自动设为 inactive
+                        this.lastActivity = Date.now();
+                        this.isActive = true;
+                    }
+                };
+                document.addEventListener('visibilitychange', this._visibilityHandler);
+                
+                // Safari/iOS 兼容：pageshow/pagehide 事件比 visibilitychange 更可靠
+                this._pageShowHandler = (e) => {
+                    // e.persisted 表示页面从 bfcache 恢复
                     this.lastActivity = Date.now();
                     this.isActive = true;
-                }
-            };
-            document.addEventListener('visibilitychange', this._visibilityHandler);
-            
-            // 窗口获得焦点时更新活动状态
-            this._focusHandler = () => {
-                this.lastActivity = Date.now();
-                // 不立即设为 active，让定时器检测决定
-            };
-            window.addEventListener('focus', this._focusHandler);
+                };
+                this._pageHideHandler = () => {
+                    this.save();
+                    this.isActive = false;
+                };
+                window.addEventListener('pageshow', this._pageShowHandler);
+                window.addEventListener('pagehide', this._pageHideHandler);
+                
+                // 窗口获得焦点时更新活动状态（同时监听 window 和 document）
+                this._focusHandler = () => {
+                    this.lastActivity = Date.now();
+                    // Safari 上 focus 事件更可靠，直接设置 active
+                    this.isActive = true;
+                };
+                this._blurHandler = () => {
+                    // 窗口失去焦点时保存数据（Safari 上 visibilitychange 可能不触发）
+                    this.save();
+                };
+                window.addEventListener('focus', this._focusHandler);
+                window.addEventListener('blur', this._blurHandler);
+                document.addEventListener('focus', this._focusHandler);
 
-            // 页面卸载前保存
-            this._beforeUnloadHandler = () => this.save();
-            window.addEventListener('beforeunload', this._beforeUnloadHandler);
+                // 页面卸载前保存
+                this._beforeUnloadHandler = () => this.save();
+                window.addEventListener('beforeunload', this._beforeUnloadHandler);
+                
+            } catch (e) {
+                Logger.log('Failed to bind events:', e);
+                // 降级：即使事件绑定失败，也尝试启动基本功能
+            }
         }
 
         _onActivity() {
@@ -1390,6 +1444,9 @@
             
             // 用于检测系统休眠/恢复
             let lastCheckTime = Date.now();
+            
+            // 记录定时器启动时间，用于健康检查
+            this._trackingStartTime = Date.now();
             
             this._intervals.push(
                 setInterval(() => {
@@ -1420,6 +1477,16 @@
                 }, CONFIG.INTERVALS.READING_TRACK),
                 setInterval(() => this.save(), CONFIG.INTERVALS.READING_SAVE)
             );
+            
+            // 健康检查：每 60 秒检查定时器是否还存活
+            // 如果定时器意外被清除，尝试重新启动
+            this._healthCheckId = setInterval(() => {
+                if (this._tracking && this._intervals.length === 0) {
+                    Logger.log('Tracking timers died, restarting...');
+                    this._tracking = false;
+                    this._startTracking();
+                }
+            }, 60000);
         }
 
         save() {
@@ -1596,23 +1663,41 @@
             this._intervals = [];
             this._tracking = false;
             
-            // 移除普通事件监听器
-            if (this._activityHandler) {
-                ['mousedown', 'keydown', 'click', 'touchstart', 'pointerdown'].forEach(e => {
-                    document.removeEventListener(e, this._activityHandler, { passive: true, capture: false });
+            // 清除健康检查定时器
+            if (this._healthCheckId) {
+                clearInterval(this._healthCheckId);
+                this._healthCheckId = null;
+            }
+            
+            // 移除普通事件监听器（注意：capture 必须与添加时一致）
+            if (this._activityHandler && this._normalEvents) {
+                this._normalEvents.forEach(e => {
+                    document.removeEventListener(e, this._activityHandler, { passive: true, capture: true });
                 });
             }
             // 移除高频事件监听器
-            if (this._highFreqHandler) {
-                ['mousemove', 'scroll', 'wheel', 'touchmove', 'pointermove'].forEach(e => {
-                    document.removeEventListener(e, this._highFreqHandler, { passive: true, capture: false });
+            if (this._highFreqHandler && this._highFreqEvents) {
+                this._highFreqEvents.forEach(e => {
+                    document.removeEventListener(e, this._highFreqHandler, { passive: true, capture: true });
                 });
             }
             if (this._visibilityHandler) {
                 document.removeEventListener('visibilitychange', this._visibilityHandler);
             }
+            // 移除 Safari 兼容事件
+            if (this._pageShowHandler) {
+                window.removeEventListener('pageshow', this._pageShowHandler);
+            }
+            if (this._pageHideHandler) {
+                window.removeEventListener('pagehide', this._pageHideHandler);
+            }
+            // 移除焦点事件
             if (this._focusHandler) {
                 window.removeEventListener('focus', this._focusHandler);
+                document.removeEventListener('focus', this._focusHandler);
+            }
+            if (this._blurHandler) {
+                window.removeEventListener('blur', this._blurHandler);
             }
             if (this._beforeUnloadHandler) {
                 window.removeEventListener('beforeunload', this._beforeUnloadHandler);
