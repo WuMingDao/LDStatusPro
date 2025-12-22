@@ -29,7 +29,7 @@
     (function() {
         'use strict';
 
-        // ==================== 尽早捕获 OAuth 登录结果 ====================
+        // ==================== 尽早捕获 OAuth 登录结果 =====================
         // 由于 Discourse 路由可能会处理掉 URL hash，需要在脚本最开始就提取
         let _pendingOAuthData = null;
         try {
