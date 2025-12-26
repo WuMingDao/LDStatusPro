@@ -1,7 +1,7 @@
 ﻿    // ==UserScript==
     // @name         LDStatus Pro
     // @namespace    http://tampermonkey.net/
-    // @version      3.5.0.8
+    // @version      3.5.1.0
     // @description  在 Linux.do 和 IDCFlare 页面显示信任级别进度，支持历史趋势、里程碑通知、阅读时间统计、排行榜系统、我的活动查看。两站点均支持排行榜和云同步功能
     // @author       JackLiii
     // @license      MIT
@@ -1242,11 +1242,70 @@
             }
 
             // 获取 JSON 数据（带 cookie 同源请求）
+            // iOS Safari 中 GM_xmlhttpRequest 的 withCredentials 可能无法正确传递 cookie
+            // 因此对同源请求优先使用原生 fetch，可以正确携带 cookie
             async fetchJson(url, options = {}) {
                 const timeout = options.timeout || CONFIG.NETWORK.TIMEOUT;
                 const headers = options.headers || {};
                 
-                // 使用 GM_xmlhttpRequest 发送带 cookie 的请求
+                // 检查是否为同源请求
+                const isSameOrigin = this._isSameOrigin(url);
+                
+                // 同源请求优先使用原生 fetch（iOS Safari 兼容性更好）
+                if (isSameOrigin) {
+                    return this._fetchJsonNative(url, timeout, headers);
+                }
+                
+                // 跨域请求使用 GM_xmlhttpRequest
+                return this._fetchJsonGM(url, timeout, headers);
+            }
+            
+            // 检查 URL 是否与当前页面同源
+            _isSameOrigin(url) {
+                try {
+                    const urlObj = new URL(url, location.href);
+                    return urlObj.origin === location.origin;
+                } catch {
+                    return false;
+                }
+            }
+            
+            // 使用原生 fetch 获取 JSON（同源请求，更好的 cookie 支持）
+            async _fetchJsonNative(url, timeout, headers) {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), timeout);
+                
+                try {
+                    const resp = await fetch(url, {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/json',
+                            ...headers
+                        },
+                        credentials: 'include',
+                        signal: controller.signal
+                    });
+                    
+                    clearTimeout(timeoutId);
+                    
+                    if (resp.status >= 200 && resp.status < 300) {
+                        return await resp.json();
+                    } else if (resp.status === 403 || resp.status === 401) {
+                        throw new Error('需要登录后访问');
+                    } else {
+                        throw new Error(`HTTP ${resp.status}`);
+                    }
+                } catch (e) {
+                    clearTimeout(timeoutId);
+                    if (e.name === 'AbortError') {
+                        throw new Error('请求超时');
+                    }
+                    throw e;
+                }
+            }
+            
+            // 使用 GM_xmlhttpRequest 获取 JSON（跨域请求）
+            _fetchJsonGM(url, timeout, headers) {
                 return new Promise((resolve, reject) => {
                     const timeoutId = setTimeout(() => reject(new Error('Timeout')), timeout);
                     
@@ -1264,7 +1323,7 @@
                             try {
                                 if (res.status >= 200 && res.status < 300) {
                                     resolve(JSON.parse(res.responseText));
-                                } else if (res.status === 403) {
+                                } else if (res.status === 403 || res.status === 401) {
                                     reject(new Error('需要登录后访问'));
                                 } else {
                                     reject(new Error(`HTTP ${res.status}`));
@@ -3015,7 +3074,7 @@
     #ldsp-panel input,#ldsp-panel textarea{cursor:text;user-select:text}
     #ldsp-panel [data-clickable],#ldsp-panel [data-clickable] *,#ldsp-panel button,#ldsp-panel a,#ldsp-panel .ldsp-tab,#ldsp-panel .ldsp-subtab,#ldsp-panel .ldsp-ring-lvl,#ldsp-panel .ldsp-rd-day-bar,#ldsp-panel .ldsp-year-cell:not(.empty),#ldsp-panel .ldsp-rank-item,#ldsp-panel .ldsp-ticket-item,#ldsp-panel .ldsp-ticket-type,#ldsp-panel .ldsp-ticket-tab,#ldsp-panel .ldsp-ticket-close,#ldsp-panel .ldsp-ticket-back,#ldsp-panel .ldsp-lb-refresh,#ldsp-panel .ldsp-modal-btn,#ldsp-panel .ldsp-lb-btn,#ldsp-panel .ldsp-update-bubble-close{cursor:pointer}
     #ldsp-panel.no-trans,#ldsp-panel.no-trans *{transition:none!important;animation-play-state:paused!important}
-    #ldsp-panel.anim{transition:width var(--dur-slow) var(--ease),height var(--dur-slow) var(--ease),left var(--dur-slow) var(--ease),top var(--dur-slow) var(--ease)}
+    #ldsp-panel.anim{transition:width var(--dur-slow) var(--ease),height var(--dur-slow) var(--ease),min-width var(--dur-slow) var(--ease),min-height var(--dur-slow) var(--ease),max-width var(--dur-slow) var(--ease),max-height var(--dur-slow) var(--ease),top var(--dur-slow) var(--ease),border-radius var(--dur-slow) var(--ease);transform:none!important}
     #ldsp-panel.light{--bg:rgba(250,251,254,.97);--bg-card:rgba(245,247,252,.94);--bg-hover:rgba(238,242,250,.96);--bg-el:rgba(255,255,255,.94);--bg-glass:rgba(0,0,0,.012);--txt:#1e2030;--txt-sec:#4a5068;--txt-mut:#8590a6;--accent:#5070d0;--accent-light:#6b8cef;--accent2:#4a9e8f;--accent2-light:#5bb5a6;--ok:#4a9e8f;--ok-light:#5bb5a6;--ok-bg:rgba(74,158,143,.08);--err:#d45d6e;--err-light:#e07a8d;--err-bg:rgba(212,93,110,.08);--warn:#c49339;--warn-bg:rgba(196,147,57,.08);--border:rgba(0,0,0,.08);--border2:rgba(0,0,0,.1);--border-accent:rgba(80,112,208,.2);--border-panel:rgba(0,0,0,.1);--shadow:0 1.25rem 3rem rgba(0,0,0,.08);--shadow-lg:0 1.5rem 4rem rgba(0,0,0,.12);--glow-accent:0 0 1rem rgba(80,112,208,.1);--scrollbar:var(--accent);--scrollbar-hover:var(--accent-light)}
     #ldsp-panel.collapsed{width:48px!important;height:48px!important;min-width:48px!important;min-height:48px!important;max-height:48px!important;border-radius:var(--r-md);cursor:pointer;touch-action:none;background:linear-gradient(135deg,#7a9bf5 0%,#5a7de0 50%,#5bb5a6 100%);border:none;box-shadow:var(--shadow),0 0 20px rgba(107,140,239,.35)}
     #ldsp-panel.collapsed .ldsp-hdr{padding:0;justify-content:center;align-items:center;height:100%;background:0 0;min-height:0}
@@ -3086,7 +3145,15 @@
     .ldsp-user::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--accent),transparent);opacity:.3}
     .ldsp-user-left{display:flex;flex-direction:column;flex:1;min-width:0;gap:8px;justify-content:center}
     .ldsp-user-row{display:flex;align-items:center;gap:10px}
-    .ldsp-user-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:2px}
+    .ldsp-user-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:2px;position:relative}
+    .ldsp-user-actions.collapsed{max-height:24px;overflow:hidden}
+    .ldsp-user-actions-wrap{display:flex;flex-direction:column;gap:4px;flex:1;min-width:0}
+    .ldsp-user-actions-toggle{display:none;align-items:center;justify-content:center;gap:3px;padding:4px 10px;background:transparent;border:none;border-radius:6px;font-size:9px;color:var(--txt-mut);cursor:pointer;transition:all .15s;opacity:.7}
+    .ldsp-user-actions-toggle:hover{background:var(--bg-hover);color:var(--accent);opacity:1}
+    .ldsp-user-actions-toggle.show{display:inline-flex}
+    .ldsp-user-actions-toggle svg{width:10px;height:10px;stroke-width:2;transition:transform .2s}
+    .ldsp-user-actions-toggle.expanded{color:var(--accent);opacity:1}
+    .ldsp-user-actions-toggle.expanded svg{transform:rotate(180deg)}
     .ldsp-avatar{width:var(--av);height:var(--av);border-radius:12px;border:2px solid var(--accent);flex-shrink:0;background:var(--bg-el);position:relative;box-shadow:0 4px 12px rgba(107,140,239,.2);transition:transform .3s var(--ease),box-shadow .3s,border-color .2s}
     .ldsp-avatar:hover{transform:scale(1.08) rotate(-3deg);border-color:var(--accent-light);box-shadow:0 6px 20px rgba(107,140,239,.35),var(--glow-accent)}
     .ldsp-avatar-ph{width:var(--av);height:var(--av);border-radius:12px;background:var(--grad);display:flex;align-items:center;justify-content:center;font-size:18px;color:#fff;flex-shrink:0;transition:transform .3s var(--ease),box-shadow .3s;position:relative;box-shadow:0 4px 12px rgba(107,140,239,.25)}
@@ -3544,6 +3611,61 @@
     /* 吃瓜助手样式 */
     .ldsp-melon-btn{background:linear-gradient(135deg,rgba(74,222,128,.08),rgba(34,197,94,.12));border-color:rgba(74,222,128,.2);color:rgba(34,197,94,.85)}
     .ldsp-melon-btn:hover{background:linear-gradient(135deg,rgba(74,222,128,.15),rgba(34,197,94,.2));border-color:rgba(74,222,128,.35);color:#22c55e}
+    /* 导出帖子按钮样式 - 使用橙色调 */
+    .ldsp-export-btn{background:linear-gradient(135deg,rgba(251,146,60,.08),rgba(234,88,12,.12));border-color:rgba(251,146,60,.2);color:rgba(234,88,12,.85)}
+    .ldsp-export-btn:hover{background:linear-gradient(135deg,rgba(251,146,60,.15),rgba(234,88,12,.2));border-color:rgba(251,146,60,.35);color:#ea580c}
+    /* 导出帖子面板样式 */
+    .ldsp-export-overlay{position:absolute;top:0;left:0;right:0;bottom:0;background:var(--bg);border-radius:0 0 var(--r-lg) var(--r-lg);z-index:10;display:none;flex-direction:column;overflow:hidden}
+    .ldsp-export-overlay.show{display:flex}
+    .ldsp-export-header{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--bg-card);border-bottom:1px solid var(--border);flex-shrink:0}
+    .ldsp-export-title{font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px;color:var(--txt)}
+    .ldsp-export-header-actions{display:flex;align-items:center;gap:6px}
+    .ldsp-export-refresh{padding:4px 10px;display:flex;align-items:center;justify-content:center;gap:4px;background:linear-gradient(135deg,rgba(107,140,239,.08),rgba(90,125,224,.12));border:1px solid rgba(107,140,239,.2);border-radius:6px;font-size:10px;color:var(--accent);cursor:pointer;transition:all .15s;white-space:nowrap}
+    .ldsp-export-refresh:hover{background:linear-gradient(135deg,rgba(107,140,239,.15),rgba(90,125,224,.2));border-color:rgba(107,140,239,.4);color:#5a7de0}
+    .ldsp-export-close{width:24px;height:24px;display:flex;align-items:center;justify-content:center;background:var(--bg-el);border:1px solid var(--border);border-radius:6px;font-size:12px;color:var(--txt-sec);cursor:pointer;transition:background .15s,color .15s}
+    .ldsp-export-close:hover{background:var(--err-bg);color:var(--err);border-color:var(--err)}
+    .ldsp-export-body{flex:1;overflow-y:auto;padding:12px;background:var(--bg);display:flex;flex-direction:column;gap:10px}
+    .ldsp-export-info{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-md);padding:12px;font-size:11px}
+    .ldsp-export-info-title{font-weight:600;color:var(--txt);margin-bottom:8px;display:flex;align-items:flex-start;gap:5px;line-height:1.5;font-size:12px}
+    .ldsp-export-info-row{display:flex;align-items:center;gap:6px;color:var(--txt-sec);font-size:10px;margin-top:4px}
+    .ldsp-export-info-label{color:var(--txt-mut);min-width:50px}
+    .ldsp-export-info-value{color:var(--txt);font-weight:500}
+    .ldsp-export-info-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+    .ldsp-export-info-category{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;background:var(--accent);color:#fff;border-radius:10px;font-size:9px;font-weight:600}
+    .ldsp-export-info-tag{display:inline-flex;align-items:center;padding:2px 8px;background:var(--bg-el);color:var(--txt-sec);border-radius:10px;font-size:9px;font-weight:500;border:1px solid var(--border)}
+    .ldsp-export-range{display:flex;align-items:center;gap:8px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-md);padding:10px;flex-wrap:wrap}
+    .ldsp-export-range-label{font-size:10px;color:var(--txt-sec);white-space:nowrap}
+    .ldsp-export-range-input{width:70px;padding:5px 8px;background:var(--bg-el);border:1px solid var(--border);border-radius:var(--r-sm);font-size:11px;color:var(--txt);text-align:center}
+    .ldsp-export-range-input:focus{border-color:var(--accent);outline:none}
+    .ldsp-export-range-sep{color:var(--txt-mut);font-size:10px}
+    .ldsp-export-range-hint{font-size:9px;color:var(--txt-mut);margin-left:auto}
+    .ldsp-export-options{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-md);padding:10px}
+    .ldsp-export-options-title{font-size:10px;color:var(--txt-sec);margin-bottom:8px}
+    .ldsp-export-option{display:flex;align-items:center;gap:8px;padding:6px 0}
+    .ldsp-export-option input[type="checkbox"]{width:16px;height:16px;accent-color:var(--accent)}
+    .ldsp-export-option label{font-size:11px;color:var(--txt);cursor:pointer}
+    .ldsp-export-format-selector{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-md);padding:10px}
+    .ldsp-export-format-title{font-size:10px;color:var(--txt-sec);margin-bottom:8px}
+    .ldsp-export-format-cards{display:flex;gap:8px}
+    .ldsp-export-format-card{flex:1;display:flex;flex-direction:column;align-items:center;padding:12px 8px;background:var(--bg-el);border:2px solid var(--border);border-radius:var(--r-md);cursor:pointer;transition:all .2s}
+    .ldsp-export-format-card:hover{border-color:var(--txt-mut);background:var(--bg-hover);transform:translateY(-1px)}
+    .ldsp-export-format-card.active{border-color:var(--accent);background:rgba(107,140,239,.1);box-shadow:0 2px 8px rgba(107,140,239,.15)}
+    .ldsp-export-format-card input{display:none}
+    .ldsp-export-format-card-icon{width:28px;height:28px;margin-bottom:6px;display:flex;align-items:center;justify-content:center}
+    .ldsp-export-format-card-icon svg{width:24px;height:24px}
+    .ldsp-export-format-card-name{font-size:11px;font-weight:600;color:var(--txt)}
+    .ldsp-export-format-card.active .ldsp-export-format-card-name{color:var(--accent)}
+    .ldsp-export-actions{display:flex;gap:8px}
+    .ldsp-export-btn-start{flex:1;padding:12px;border:none;border-radius:var(--r-md);font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:6px;background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;box-shadow:0 2px 8px rgba(34,197,94,.2)}
+    .ldsp-export-btn-start:hover{box-shadow:0 4px 16px rgba(34,197,94,.35);transform:translateY(-2px)}
+    .ldsp-export-btn-start:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
+    .ldsp-export-btn-stop{flex:1;padding:12px;border:none;border-radius:var(--r-md);font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:6px;background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;box-shadow:0 2px 8px rgba(239,68,68,.2)}
+    .ldsp-export-btn-stop:hover{box-shadow:0 4px 16px rgba(239,68,68,.35);transform:translateY(-2px)}
+    .ldsp-export-status{text-align:center;padding:14px;color:var(--txt-sec);font-size:11px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-md)}
+    .ldsp-export-status-icon{font-size:24px;margin-bottom:8px;display:block}
+    .ldsp-export-not-topic{text-align:center;padding:40px 20px;color:var(--txt-mut)}
+    .ldsp-export-not-topic-icon{font-size:36px;margin-bottom:10px}
+    .ldsp-export-not-topic-text{font-size:12px;line-height:1.6}
     /* LDC 积分按钮样式 - 使用与主题一致的蓝紫色调 */
     .ldsp-ldc-btn{background:linear-gradient(135deg,rgba(139,92,246,.08),rgba(124,58,237,.12));border-color:rgba(139,92,246,.2);color:rgba(139,92,246,.85)}
     .ldsp-ldc-btn:hover{background:linear-gradient(135deg,rgba(139,92,246,.15),rgba(124,58,237,.2));border-color:rgba(139,92,246,.35);color:#8b5cf6}
@@ -3576,6 +3698,21 @@
     .ldsp-ldc-login-btn:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(107,140,239,.4)}
     .ldsp-ldc-retry-btn{margin-top:8px;padding:8px 16px;background:var(--accent);color:#fff;border:none;border-radius:var(--r-sm);font-size:11px;cursor:pointer;transition:opacity .15s}
     .ldsp-ldc-retry-btn:hover{opacity:.85}
+    /* iOS Safari 限制提示 */
+    .ldsp-ldc-ios-guide{display:block;padding:12px;text-align:center;overflow-y:auto;-webkit-overflow-scrolling:touch}
+    .ldsp-ldc-ios-icon{font-size:28px;margin-bottom:6px;display:block}
+    .ldsp-ldc-ios-title{font-size:13px;font-weight:700;color:var(--txt);margin-bottom:8px}
+    .ldsp-ldc-ios-desc{font-size:10px;color:var(--txt-sec);margin-bottom:12px;line-height:1.5;padding:0 4px}
+    .ldsp-ldc-ios-desc strong{color:var(--txt);font-weight:600}
+    .ldsp-ldc-ios-solutions{margin-bottom:10px}
+    .ldsp-ldc-ios-solution{padding:10px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-md);text-align:left;margin-bottom:8px}
+    .ldsp-ldc-ios-solution.alt{background:var(--bg-el);border-style:dashed;margin-bottom:0}
+    .ldsp-ldc-ios-solution-title{font-size:11px;font-weight:600;color:var(--txt);margin-bottom:4px}
+    .ldsp-ldc-ios-solution-desc{font-size:10px;color:var(--txt-sec);margin-bottom:8px;line-height:1.4}
+    .ldsp-ldc-ios-solution.alt .ldsp-ldc-ios-solution-desc{margin-bottom:0}
+    .ldsp-ldc-ios-btn{display:block;padding:10px 16px;border-radius:var(--r-sm);font-size:11px;font-weight:600;cursor:pointer;text-decoration:none!important;border:none;width:100%;text-align:center;box-sizing:border-box;-webkit-appearance:none;-webkit-tap-highlight-color:transparent}
+    .ldsp-ldc-ios-btn.primary{background:var(--grad);color:#fff!important;box-shadow:0 2px 6px rgba(107,140,239,.25)}
+    .ldsp-ldc-ios-tip{font-size:9px;color:var(--txt-mut);padding:8px;background:var(--bg-el);border-radius:var(--r-sm);line-height:1.4}
     /* 概览页 - 余额卡片 */
     .ldsp-ldc-balance-card{background:linear-gradient(135deg,rgba(139,92,246,.12),rgba(107,140,239,.15));border:1px solid rgba(139,92,246,.25);border-radius:var(--r-md);padding:16px;text-align:center}
     .ldsp-ldc-balance-label{font-size:11px;color:var(--txt-sec);margin-bottom:4px}
@@ -3616,6 +3753,39 @@
     .ldsp-ldc-footer{display:flex;justify-content:center;padding-top:8px;border-top:1px solid var(--border)}
     .ldsp-ldc-update-time{font-size:9px;color:var(--txt-mut)}
     .ldsp-ldc-empty{text-align:center;padding:16px;color:var(--txt-mut);font-size:11px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-md)}
+    /* 支持页面 */
+    .ldsp-ldc-support{display:flex;flex-direction:column;gap:14px;flex:1}
+    .ldsp-ldc-support-header{text-align:center;padding:12px 10px;background:linear-gradient(135deg,rgba(239,68,68,.06),rgba(249,115,22,.04),rgba(107,140,239,.06));border-radius:var(--r-md);border:1px solid rgba(239,68,68,.1)}
+    .ldsp-ldc-support-title{font-size:15px;font-weight:700;color:var(--txt);margin-bottom:6px;display:flex;align-items:center;justify-content:center;gap:8px}
+    .ldsp-ldc-support-desc{font-size:11px;color:var(--txt-sec);line-height:1.6}
+    .ldsp-ldc-support-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .ldsp-ldc-support-card{display:flex;flex-direction:column;align-items:center;padding:16px 12px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-md);cursor:pointer;transition:all .35s cubic-bezier(.4,0,.2,1);text-decoration:none!important;position:relative;overflow:hidden}
+    .ldsp-ldc-support-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--card-accent,var(--border));transition:all .35s cubic-bezier(.4,0,.2,1)}
+    .ldsp-ldc-support-card::after{content:'';position:absolute;inset:0;background:linear-gradient(135deg,var(--card-accent,transparent),transparent);opacity:0;transition:opacity .35s cubic-bezier(.4,0,.2,1)}
+    .ldsp-ldc-support-card:hover{border-color:var(--card-accent,var(--accent));transform:translateY(-3px);box-shadow:0 8px 24px rgba(0,0,0,.12),0 0 0 1px var(--card-accent,var(--accent))}
+    .ldsp-ldc-support-card:hover::before{height:4px}
+    .ldsp-ldc-support-card:hover::after{opacity:.06}
+    .ldsp-ldc-support-card:active{transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,.1)}
+    .ldsp-ldc-support-card.tier-1{--card-accent:#10b981;--card-glow:rgba(16,185,129,.2)}
+    .ldsp-ldc-support-card.tier-2{--card-accent:#3b82f6;--card-glow:rgba(59,130,246,.2)}
+    .ldsp-ldc-support-card.tier-3{--card-accent:#f59e0b;--card-glow:rgba(245,158,11,.2)}
+    .ldsp-ldc-support-card.tier-4{--card-accent:#ef4444;--card-glow:rgba(239,68,68,.2);background:linear-gradient(135deg,rgba(239,68,68,.04),rgba(249,115,22,.03))}
+    .ldsp-ldc-support-card.tier-1:hover{box-shadow:0 8px 24px var(--card-glow),0 0 0 1px var(--card-accent)}
+    .ldsp-ldc-support-card.tier-2:hover{box-shadow:0 8px 24px var(--card-glow),0 0 0 1px var(--card-accent)}
+    .ldsp-ldc-support-card.tier-3:hover{box-shadow:0 8px 24px var(--card-glow),0 0 0 1px var(--card-accent)}
+    .ldsp-ldc-support-card.tier-4:hover{box-shadow:0 8px 24px var(--card-glow),0 0 0 1px var(--card-accent)}
+    .ldsp-ldc-support-icon{font-size:32px;margin-bottom:10px;filter:drop-shadow(0 2px 6px rgba(0,0,0,.1));transition:transform .35s cubic-bezier(.4,0,.2,1)}
+    .ldsp-ldc-support-card:hover .ldsp-ldc-support-icon{transform:scale(1.1)}
+    .ldsp-ldc-support-name{font-size:12px;font-weight:600;color:var(--txt);margin-bottom:6px;transition:color .35s}
+    .ldsp-ldc-support-card:hover .ldsp-ldc-support-name{color:var(--card-accent,var(--txt))}
+    .ldsp-ldc-support-amount{font-size:18px;font-weight:700;color:var(--card-accent,var(--accent));display:flex;align-items:baseline;gap:3px}
+    .ldsp-ldc-support-amount span{font-size:11px;font-weight:500;color:var(--txt-mut)}
+    .ldsp-ldc-support-badge{position:absolute;top:8px;right:8px;padding:3px 8px;background:linear-gradient(135deg,var(--card-accent,var(--accent)),color-mix(in srgb,var(--card-accent,var(--accent)) 80%,#000));color:#fff;font-size:9px;font-weight:600;border-radius:10px;box-shadow:0 2px 6px rgba(0,0,0,.15)}
+    .ldsp-ldc-support-footer{text-align:center;padding:12px;background:linear-gradient(135deg,var(--bg-card),var(--bg-el));border:1px solid var(--border);border-radius:var(--r-md)}
+    .ldsp-ldc-support-footer-text{font-size:10px;color:var(--txt-mut);line-height:1.7}
+    .ldsp-ldc-support-footer-text em{font-style:normal;color:var(--accent);font-weight:600}
+    .ldsp-ldc-support-heart{display:inline-block;animation:ldsp-heartbeat 1.2s ease-in-out infinite;filter:drop-shadow(0 0 4px rgba(239,68,68,.4))}
+    @keyframes ldsp-heartbeat{0%,100%{transform:scale(1)}14%{transform:scale(1.2)}28%{transform:scale(1)}42%{transform:scale(1.15)}70%{transform:scale(1)}}
     /* 交易记录 */
     /* 交易筛选器 */
     .ldsp-ldc-filter-section{display:flex;flex-direction:column;gap:8px;padding-bottom:10px;border-bottom:1px solid var(--border)}
@@ -3680,14 +3850,18 @@
     .ldsp-ldc-detail-row .value.link{color:var(--accent);text-decoration:none;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block}
     .ldsp-ldc-detail-row .value.link:hover{text-decoration:underline}
     /* LDC/工单/吃瓜 响应式适配 */
-    @media (max-width:380px){.ldsp-ldc-header,.ldsp-ticket-header,.ldsp-melon-header{padding:8px 10px}.ldsp-ldc-title,.ldsp-ticket-title,.ldsp-melon-title{font-size:12px}.ldsp-ldc-tabs{}.ldsp-ldc-tab{padding:8px 6px;font-size:10px}.ldsp-ldc-body,.ldsp-ticket-body,.ldsp-melon-body{padding:10px;gap:8px}.ldsp-ldc-balance-card{padding:12px}.ldsp-ldc-balance-value{font-size:24px}.ldsp-ldc-stat-card{padding:10px;gap:8px}.ldsp-ldc-stat-icon{font-size:16px}.ldsp-ldc-stat-num{font-size:13px}.ldsp-ldc-chart-bars{height:60px}.ldsp-ldc-filter-section{gap:6px;padding-bottom:8px}.ldsp-ldc-filter-label{font-size:9px;min-width:24px}.ldsp-ldc-filter-chip{padding:4px 8px;font-size:9px}.ldsp-ldc-trans-item{padding:8px}.ldsp-ldc-trans-icon{font-size:14px;width:22px;height:22px}.ldsp-ldc-trans-name{font-size:11px}.ldsp-ldc-trans-amount{font-size:13px}.ldsp-ticket-tabs{padding:0 8px}.ldsp-ticket-tab,.ldsp-melon-tab{padding:6px 10px;font-size:9px}}
-    @media (max-width:320px){.ldsp-ldc-header,.ldsp-ticket-header,.ldsp-melon-header{padding:6px 8px}.ldsp-ldc-title,.ldsp-ticket-title,.ldsp-melon-title{font-size:11px;gap:4px}.ldsp-ldc-header-actions{gap:5px}.ldsp-ldc-link{font-size:9px!important}.ldsp-ldc-refresh,.ldsp-ldc-close,.ldsp-ticket-close,.ldsp-melon-close{width:22px;height:22px;font-size:10px}.ldsp-ldc-refresh svg{width:10px;height:10px}.ldsp-ldc-tab{padding:6px 4px;font-size:9px}.ldsp-ldc-body,.ldsp-ticket-body,.ldsp-melon-body{padding:8px;gap:6px}.ldsp-ldc-balance-card{padding:10px}.ldsp-ldc-balance-value{font-size:20px}.ldsp-ldc-balance-sub{font-size:9px}.ldsp-ldc-stats-grid{gap:6px}.ldsp-ldc-stat-card{padding:8px;gap:6px}.ldsp-ldc-stat-icon{font-size:14px}.ldsp-ldc-stat-label{font-size:9px}.ldsp-ldc-stat-num{font-size:12px}.ldsp-ldc-section-title{font-size:10px}.ldsp-ldc-chart{padding:8px}.ldsp-ldc-chart-bars{height:50px}.ldsp-ldc-chart-label{font-size:8px}.ldsp-ldc-filter-section{gap:5px;padding-bottom:6px}.ldsp-ldc-filter-row{gap:6px}.ldsp-ldc-filter-label{font-size:8px;min-width:20px;padding-top:4px}.ldsp-ldc-filter-chip{padding:3px 6px;font-size:8px}.ldsp-ldc-trans-content{gap:6px}.ldsp-ldc-trans-summary{font-size:9px}.ldsp-ldc-trans-list{gap:4px}.ldsp-ldc-trans-item{padding:6px 8px;gap:6px}.ldsp-ldc-trans-icon{font-size:12px;width:20px;height:20px;border-radius:4px}.ldsp-ldc-trans-name{font-size:10px}.ldsp-ldc-trans-meta{font-size:8px;gap:4px}.ldsp-ldc-trans-type{font-size:8px;padding:1px 4px}.ldsp-ldc-trans-amount{font-size:11px}.ldsp-ldc-detail-amount-value{font-size:22px}.ldsp-ldc-detail-row{padding:8px 10px}.ldsp-ldc-detail-row .label,.ldsp-ldc-detail-row .value{font-size:10px}.ldsp-ticket-tabs{padding:0 6px}.ldsp-ticket-tab,.ldsp-melon-tab{padding:5px 8px;font-size:8px}.ldsp-ticket-item{padding:8px}.ldsp-ticket-item-title{font-size:10px}.ldsp-ticket-item-type,.ldsp-ticket-item-meta{font-size:8px}}
-    @media (max-height:550px){.ldsp-ldc-body,.ldsp-ticket-body,.ldsp-melon-body{padding:8px;gap:6px}.ldsp-ldc-balance-card{padding:10px}.ldsp-ldc-balance-value{font-size:22px}.ldsp-ldc-stats-grid{gap:6px}.ldsp-ldc-stat-card{padding:8px}.ldsp-ldc-chart-bars{height:50px}.ldsp-ldc-section{gap:6px}.ldsp-ldc-filter-section{gap:5px;padding-bottom:6px}.ldsp-ldc-filter-chip{padding:4px 7px}}
-    @media (max-height:450px){.ldsp-ldc-body{padding:6px;gap:5px}.ldsp-ldc-balance-card{padding:8px}.ldsp-ldc-balance-value{font-size:18px}.ldsp-ldc-balance-label,.ldsp-ldc-balance-sub{font-size:9px}.ldsp-ldc-stats-grid{gap:4px}.ldsp-ldc-stat-card{padding:6px}.ldsp-ldc-stat-icon{font-size:12px}.ldsp-ldc-stat-num{font-size:11px}.ldsp-ldc-chart{padding:6px}.ldsp-ldc-chart-bars{height:40px}.ldsp-ldc-section{gap:4px}.ldsp-ldc-filter-section{gap:4px;padding-bottom:5px}.ldsp-ldc-filter-row{gap:4px}.ldsp-ldc-filter-chip{padding:3px 5px;font-size:8px}.ldsp-ldc-trans-item{padding:5px 6px}.ldsp-ldc-footer{padding-top:6px}}
+    @media (max-width:380px){.ldsp-ldc-header,.ldsp-ticket-header,.ldsp-melon-header{padding:8px 10px}.ldsp-ldc-title,.ldsp-ticket-title,.ldsp-melon-title{font-size:12px}.ldsp-ldc-tabs{}.ldsp-ldc-tab{padding:8px 6px;font-size:10px}.ldsp-ldc-body,.ldsp-ticket-body,.ldsp-melon-body{padding:10px;gap:8px}.ldsp-ldc-balance-card{padding:12px}.ldsp-ldc-balance-value{font-size:24px}.ldsp-ldc-stat-card{padding:10px;gap:8px}.ldsp-ldc-stat-icon{font-size:16px}.ldsp-ldc-stat-num{font-size:13px}.ldsp-ldc-chart-bars{height:60px}.ldsp-ldc-filter-section{gap:6px;padding-bottom:8px}.ldsp-ldc-filter-label{font-size:9px;min-width:24px}.ldsp-ldc-filter-chip{padding:4px 8px;font-size:9px}.ldsp-ldc-trans-item{padding:8px}.ldsp-ldc-trans-icon{font-size:14px;width:22px;height:22px}.ldsp-ldc-trans-name{font-size:11px}.ldsp-ldc-trans-amount{font-size:13px}.ldsp-ticket-tabs{padding:0 8px}.ldsp-ticket-tab,.ldsp-melon-tab{padding:6px 10px;font-size:9px}.ldsp-ldc-support{gap:12px}.ldsp-ldc-support-header{padding:10px 8px}.ldsp-ldc-support-title{font-size:13px}.ldsp-ldc-support-grid{gap:8px}.ldsp-ldc-support-card{padding:14px 10px}.ldsp-ldc-support-icon{font-size:28px;margin-bottom:8px}.ldsp-ldc-support-amount{font-size:16px}}
+    @media (max-width:320px){.ldsp-ldc-header,.ldsp-ticket-header,.ldsp-melon-header{padding:6px 8px}.ldsp-ldc-title,.ldsp-ticket-title,.ldsp-melon-title{font-size:11px;gap:4px}.ldsp-ldc-header-actions{gap:5px}.ldsp-ldc-link{font-size:9px!important}.ldsp-ldc-refresh,.ldsp-ldc-close,.ldsp-ticket-close,.ldsp-melon-close{width:22px;height:22px;font-size:10px}.ldsp-ldc-refresh svg{width:10px;height:10px}.ldsp-ldc-tab{padding:6px 4px;font-size:9px}.ldsp-ldc-body,.ldsp-ticket-body,.ldsp-melon-body{padding:8px;gap:6px}.ldsp-ldc-balance-card{padding:10px}.ldsp-ldc-balance-value{font-size:20px}.ldsp-ldc-balance-sub{font-size:9px}.ldsp-ldc-stats-grid{gap:6px}.ldsp-ldc-stat-card{padding:8px;gap:6px}.ldsp-ldc-stat-icon{font-size:14px}.ldsp-ldc-stat-label{font-size:9px}.ldsp-ldc-stat-num{font-size:12px}.ldsp-ldc-section-title{font-size:10px}.ldsp-ldc-chart{padding:8px}.ldsp-ldc-chart-bars{height:50px}.ldsp-ldc-chart-label{font-size:8px}.ldsp-ldc-filter-section{gap:5px;padding-bottom:6px}.ldsp-ldc-filter-row{gap:6px}.ldsp-ldc-filter-label{font-size:8px;min-width:20px;padding-top:4px}.ldsp-ldc-filter-chip{padding:3px 6px;font-size:8px}.ldsp-ldc-trans-content{gap:6px}.ldsp-ldc-trans-summary{font-size:9px}.ldsp-ldc-trans-list{gap:4px}.ldsp-ldc-trans-item{padding:6px 8px;gap:6px}.ldsp-ldc-trans-icon{font-size:12px;width:20px;height:20px;border-radius:4px}.ldsp-ldc-trans-name{font-size:10px}.ldsp-ldc-trans-meta{font-size:8px;gap:4px}.ldsp-ldc-trans-type{font-size:8px;padding:1px 4px}.ldsp-ldc-trans-amount{font-size:11px}.ldsp-ldc-detail-amount-value{font-size:22px}.ldsp-ldc-detail-row{padding:8px 10px}.ldsp-ldc-detail-row .label,.ldsp-ldc-detail-row .value{font-size:10px}.ldsp-ticket-tabs{padding:0 6px}.ldsp-ticket-tab,.ldsp-melon-tab{padding:5px 8px;font-size:8px}.ldsp-ticket-item{padding:8px}.ldsp-ticket-item-title{font-size:10px}.ldsp-ticket-item-type,.ldsp-ticket-item-meta{font-size:8px}.ldsp-ldc-support{gap:8px}.ldsp-ldc-support-header{padding:8px 6px}.ldsp-ldc-support-title{font-size:12px;gap:5px}.ldsp-ldc-support-desc{font-size:9px}.ldsp-ldc-support-grid{gap:6px}.ldsp-ldc-support-card{padding:12px 8px}.ldsp-ldc-support-icon{font-size:24px;margin-bottom:6px}.ldsp-ldc-support-name{font-size:10px;margin-bottom:4px}.ldsp-ldc-support-amount{font-size:14px}.ldsp-ldc-support-badge{font-size:8px;padding:2px 5px;top:6px;right:6px}.ldsp-ldc-support-footer{padding:8px}.ldsp-ldc-support-footer-text{font-size:9px}}
+    @media (max-height:550px){.ldsp-ldc-body,.ldsp-ticket-body,.ldsp-melon-body{padding:8px;gap:6px}.ldsp-ldc-balance-card{padding:10px}.ldsp-ldc-balance-value{font-size:22px}.ldsp-ldc-stats-grid{gap:6px}.ldsp-ldc-stat-card{padding:8px}.ldsp-ldc-chart-bars{height:50px}.ldsp-ldc-section{gap:6px}.ldsp-ldc-filter-section{gap:5px;padding-bottom:6px}.ldsp-ldc-filter-chip{padding:4px 7px}.ldsp-ldc-support{gap:10px}.ldsp-ldc-support-header{padding:10px 8px}.ldsp-ldc-support-grid{gap:8px}.ldsp-ldc-support-card{padding:12px 8px}.ldsp-ldc-support-icon{font-size:26px;margin-bottom:6px}.ldsp-ldc-support-amount{font-size:16px}}
+    @media (max-height:450px){.ldsp-ldc-body{padding:6px;gap:5px}.ldsp-ldc-balance-card{padding:8px}.ldsp-ldc-balance-value{font-size:18px}.ldsp-ldc-balance-label,.ldsp-ldc-balance-sub{font-size:9px}.ldsp-ldc-stats-grid{gap:4px}.ldsp-ldc-stat-card{padding:6px}.ldsp-ldc-stat-icon{font-size:12px}.ldsp-ldc-stat-num{font-size:11px}.ldsp-ldc-chart{padding:6px}.ldsp-ldc-chart-bars{height:40px}.ldsp-ldc-section{gap:4px}.ldsp-ldc-filter-section{gap:4px;padding-bottom:5px}.ldsp-ldc-filter-row{gap:4px}.ldsp-ldc-filter-chip{padding:3px 5px;font-size:8px}.ldsp-ldc-trans-item{padding:5px 6px}.ldsp-ldc-footer{padding-top:6px}.ldsp-ldc-support-header{padding:4px 0}.ldsp-ldc-support-title{font-size:12px}.ldsp-ldc-support-desc{font-size:10px}.ldsp-ldc-support-card{padding:8px 6px}.ldsp-ldc-support-icon{font-size:18px;margin-bottom:2px}.ldsp-ldc-support-name{font-size:10px}.ldsp-ldc-support-amount{font-size:12px}.ldsp-ldc-support-footer{padding:6px}.ldsp-ldc-support-footer-text{font-size:9px}}
     .ldsp-melon-overlay{position:absolute;top:0;left:0;right:0;bottom:0;background:var(--bg);border-radius:0 0 var(--r-lg) var(--r-lg);z-index:10;display:none;flex-direction:column;overflow:hidden}
     .ldsp-melon-overlay.show{display:flex}
     .ldsp-melon-header{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--bg-card);border-bottom:1px solid var(--border);flex-shrink:0}
     .ldsp-melon-title{font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px;color:var(--txt)}
+    .ldsp-melon-header-actions{display:flex;align-items:center;gap:6px}
+    .ldsp-melon-refresh{padding:4px 10px;display:flex;align-items:center;justify-content:center;gap:4px;background:linear-gradient(135deg,rgba(74,222,128,.08),rgba(34,197,94,.12));border:1px solid rgba(74,222,128,.2);border-radius:6px;font-size:10px;color:#22c55e;cursor:pointer;transition:all .15s;white-space:nowrap}
+    .ldsp-melon-refresh:hover{background:linear-gradient(135deg,rgba(74,222,128,.15),rgba(34,197,94,.2));border-color:rgba(74,222,128,.4);color:#16a34a}
+    .ldsp-melon-refresh svg{flex-shrink:0}
     .ldsp-melon-close{width:24px;height:24px;display:flex;align-items:center;justify-content:center;background:var(--bg-el);border:1px solid var(--border);border-radius:6px;font-size:12px;color:var(--txt-sec);transition:background .15s,color .15s;cursor:pointer}
     .ldsp-melon-close:hover{background:var(--err-bg);color:var(--err);border-color:var(--err)}
     .ldsp-melon-tabs{display:flex;border-bottom:1px solid var(--border);padding:0 10px;background:var(--bg-card);flex-shrink:0}
@@ -3822,7 +3996,7 @@
     .ldsp-melon-setting-title{font-size:11px;font-weight:600;color:var(--txt);margin-bottom:10px;display:flex;align-items:center;gap:5px}
     .ldsp-melon-setting-row{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
     .ldsp-melon-setting-row:last-child{margin-bottom:0}
-    .ldsp-melon-setting-label{font-size:10px;color:var(--txt-sec)}
+    .ldsp-melon-setting-label{font-size:10px;color:var(--txt-sec);display:flex;align-items:center;gap:4px}
     .ldsp-melon-setting-input{padding:8px;background:var(--bg-el);border:1px solid var(--border);border-radius:var(--r-sm);font-size:11px;color:var(--txt)}
     .ldsp-melon-setting-input:focus{border-color:var(--accent);outline:none}
     .ldsp-melon-setting-input::placeholder{color:var(--txt-mut)}
@@ -3840,15 +4014,22 @@
     .ldsp-melon-prompt-reset{margin-left:6px;cursor:pointer;color:var(--err);font-size:10px;opacity:.6;transition:all .15s}
     .ldsp-melon-prompt-reset:hover{opacity:1;color:var(--err)}
     .ldsp-melon-setting-prompt-actions{display:flex;gap:8px;margin-top:8px}
-    .ldsp-melon-setting-security{display:flex;align-items:flex-start;gap:10px;margin-top:12px;padding:12px;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);border-radius:var(--r-md)}
-    .ldsp-melon-setting-security-icon{font-size:18px;flex-shrink:0}
-    .ldsp-melon-setting-security-text{font-size:10px;color:var(--txt-sec);line-height:1.5}
+    .ldsp-melon-setting-security{display:flex;align-items:center;gap:8px;padding:10px 12px;background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.15);border-radius:var(--r-md)}
+    .ldsp-melon-setting-security-icon{font-size:14px;flex-shrink:0}
+    .ldsp-melon-setting-security-text{font-size:10px;color:var(--txt-sec);line-height:1.4}
     .ldsp-melon-setting-security-text strong{color:var(--ok);font-weight:600}
-    .ldsp-melon-setting-hint{font-size:9px;color:var(--txt-mut);margin-top:2px}
-    .ldsp-melon-setting-danger{background:var(--err-bg);border-color:rgba(239,68,68,.2);text-align:center}
-    .ldsp-melon-setting-danger .ldsp-melon-setting-title{color:var(--err)}
-    .ldsp-melon-setting-danger-desc{font-size:10px;color:var(--txt-sec);margin-bottom:10px}
-    .ldsp-melon-setting-danger .ldsp-melon-setting-btn{display:inline-block;flex:none;min-width:160px}
+    .ldsp-melon-setting-hint{font-size:9px;color:var(--txt-mut);margin-top:3px;line-height:1.4}
+    .ldsp-melon-setting-hint strong{color:var(--accent);font-weight:500}
+    .ldsp-melon-setting-subtitle{font-size:9px;color:var(--txt-mut);font-weight:400;margin-left:4px}
+    .ldsp-melon-setting-actions{margin-top:10px}
+    .ldsp-melon-prompt-status{font-size:9px;color:var(--txt-mut);margin-left:auto;font-weight:400}
+    .ldsp-melon-prompt-status.custom{color:var(--ok)}
+    .ldsp-melon-setting-danger{background:var(--err-bg);border-color:rgba(239,68,68,.15);padding:10px 12px}
+    .ldsp-melon-setting-danger .ldsp-melon-setting-title{color:var(--err);margin-bottom:2px}
+    .ldsp-melon-setting-danger-content{display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .ldsp-melon-setting-danger-info{flex:1}
+    .ldsp-melon-setting-danger-desc{font-size:9px;color:var(--txt-sec)}
+    .ldsp-melon-setting-danger .ldsp-melon-setting-btn{flex:none;padding:8px 16px}
     .ldsp-melon-btn-danger{background:linear-gradient(135deg,#ef4444,#dc2626) !important}
     .ldsp-melon-btn-danger:hover{box-shadow:0 4px 12px rgba(239,68,68,.35) !important}
     .ldsp-melon-warning{background:rgba(212,168,83,.1);border:1px solid rgba(212,168,83,.3);border-radius:var(--r-sm);padding:8px 10px;font-size:10px;color:var(--warn);margin-bottom:8px}
@@ -4744,6 +4925,781 @@
             }
         }
 
+        // ==================== 话题导出器 ====================
+        // 将话题内容和评论导出为 PDF 或 HTML 文件
+        class TopicExporter {
+            constructor(panelBody, renderer) {
+                this.panelBody = panelBody;
+                this.renderer = renderer;
+                this.overlay = null;
+                this._topicCache = null;
+                this._lastUrl = location.href;
+                this._urlCheckInterval = null;
+                this._embedImages = true;  // 默认嵌入图片
+            }
+
+            init() {
+                this._createOverlay();
+                this._abortController = null;  // 用于停止导出
+                this._selectedFormat = 'html';  // 默认格式
+            }
+
+            _createOverlay() {
+                this.overlay = document.createElement('div');
+                this.overlay.className = 'ldsp-export-overlay';
+                this.overlay.innerHTML = `
+                    <div class="ldsp-export-header">
+                        <div class="ldsp-export-title">📥 导出帖子</div>
+                        <div class="ldsp-export-header-actions">
+                            <div class="ldsp-export-refresh" title="刷新信息"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>刷新</div>
+                            <div class="ldsp-export-close">×</div>
+                        </div>
+                    </div>
+                    <div class="ldsp-export-body"></div>`;
+                if (this.panelBody) {
+                    this.panelBody.appendChild(this.overlay);
+                }
+                this._bindEvents();
+            }
+
+            _bindEvents() {
+                this.overlay.querySelector('.ldsp-export-close').addEventListener('click', () => this.hide());
+                this.overlay.querySelector('.ldsp-export-refresh').addEventListener('click', () => this._handleRefresh());
+                document.addEventListener('keydown', e => {
+                    if (e.key === 'Escape' && this.overlay.classList.contains('show')) this.hide();
+                });
+            }
+
+            async _handleRefresh() {
+                const refreshBtn = this.overlay.querySelector('.ldsp-export-refresh');
+                if (refreshBtn.classList.contains('spinning')) return;
+                refreshBtn.classList.add('spinning');
+                this._topicCache = null;  // 清除缓存
+                await this._renderHome(true);
+                setTimeout(() => refreshBtn.classList.remove('spinning'), 500);
+            }
+
+            // URL 监听 - 仅在面板打开且非话题页时启动
+            _startUrlWatch() {
+                if (this._urlCheckInterval) return;
+                this._urlCheckInterval = setInterval(() => {
+                    const currentUrl = location.href;
+                    if (currentUrl !== this._lastUrl) {
+                        this._lastUrl = currentUrl;
+                        this._topicCache = null;
+                        if (this.overlay.classList.contains('show')) {
+                            const newTopicId = this._getTopicId();
+                            if (newTopicId) {
+                                this._renderHome();
+                                this._stopUrlWatch();
+                            }
+                        }
+                    }
+                }, 800);
+            }
+
+            _stopUrlWatch() {
+                if (this._urlCheckInterval) {
+                    clearInterval(this._urlCheckInterval);
+                    this._urlCheckInterval = null;
+                }
+            }
+
+            show() {
+                this._lastUrl = location.href;
+                const currentTopicId = this._getTopicId();
+                if (this._topicCache && this._topicCache.id !== currentTopicId) {
+                    this._topicCache = null;
+                }
+                this.overlay.classList.add('show');
+                this._renderHome();
+            }
+
+            hide() {
+                this._stopUrlWatch();
+                this.overlay.classList.remove('show');
+            }
+
+            _getTopicId() {
+                return window.location.href.match(/\/t(?:opic)?\/[^\/]+\/(\d+)/)?.[1] || 
+                       window.location.href.match(/\/t(?:opic)?\/(\d+)/)?.[1];
+            }
+
+            async _getTopicInfo(forceRefresh = false) {
+                const topicId = this._getTopicId();
+                if (!topicId) return null;
+                
+                if (!forceRefresh && this._topicCache && this._topicCache.id === topicId) {
+                    return this._topicCache;
+                }
+                
+                try {
+                    const csrf = document.querySelector('meta[name="csrf-token"]')?.content;
+                    const response = await fetch(`${location.origin}/t/${topicId}.json`, {
+                        headers: {
+                            'x-csrf-token': csrf,
+                            'x-requested-with': 'XMLHttpRequest'
+                        }
+                    });
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    const data = await response.json();
+                    
+                    // 从 DOM 获取分类名称和颜色
+                    const categoryEl = document.querySelector('.badge-category__name, .category-name');
+                    const categoryName = categoryEl?.textContent?.trim() || '';
+                    // 尝试获取分类颜色
+                    const categoryStyle = document.querySelector('.badge-category')?.getAttribute('style') || '';
+                    const categoryColor = categoryStyle.match(/background-color:\s*#([0-9a-fA-F]+)/)?.[1] || '';
+                    
+                    // 从 API 或 DOM 获取标签
+                    let tags = [];
+                    if (data.tags && data.tags.length > 0) {
+                        tags = data.tags;
+                    } else {
+                        // 从 DOM 获取
+                        const tagEls = document.querySelectorAll('.discourse-tags .discourse-tag, .topic-header-extra .discourse-tag');
+                        tags = Array.from(tagEls).map(el => el.textContent.trim()).filter(Boolean);
+                    }
+                    
+                    this._topicCache = {
+                        id: topicId,
+                        title: data.title || '未知标题',
+                        category: categoryName,
+                        categoryColor: categoryColor,
+                        tags: tags,
+                        postsCount: data.posts_count || 1,
+                        views: data.views || 0,
+                        likeCount: data.like_count || 0,
+                        createdAt: data.created_at,
+                        lastPostedAt: data.last_posted_at
+                    };
+                    return this._topicCache;
+                } catch (e) {
+                    // 降级：从页面 DOM 获取
+                    const categoryEl = document.querySelector('.badge-category__name, .category-name');
+                    const tagEls = document.querySelectorAll('.discourse-tags .discourse-tag, .topic-header-extra .discourse-tag');
+                    const fallbackInfo = {
+                        id: topicId,
+                        title: document.querySelector('.fancy-title, .topic-title')?.textContent?.trim() || '当前话题',
+                        category: categoryEl?.textContent?.trim() || '',
+                        categoryColor: '',
+                        tags: Array.from(tagEls).map(el => el.textContent.trim()).filter(Boolean),
+                        postsCount: 1,
+                        views: 0
+                    };
+                    return fallbackInfo;
+                }
+            }
+
+            // 获取帖子内容（参考给定脚本）
+            async _fetchPosts(topicId, start, end, progressCallback, abortSignal) {
+                const csrf = document.querySelector('meta[name="csrf-token"]')?.content;
+                const opts = {
+                    headers: {
+                        'x-csrf-token': csrf,
+                        'x-requested-with': 'XMLHttpRequest'
+                    },
+                    signal: abortSignal
+                };
+
+                progressCallback?.('正在获取帖子列表...');
+                const idRes = await fetch(`${location.origin}/t/${topicId}/post_ids.json?post_number=0&limit=99999`, opts);
+                if (!idRes.ok) throw new Error(`获取帖子列表失败 (${idRes.status})`);
+                const idData = await idRes.json();
+                
+                let pIds = idData.post_ids.slice(Math.max(0, start - 1), end);
+
+                // 如果包含第1楼，获取主帖信息确保第一楼ID正确
+                if (start <= 1 && pIds.length > 0) {
+                    const mainRes = await fetch(`${location.origin}/t/${topicId}.json`, opts);
+                    if (mainRes.ok) {
+                        const mainData = await mainRes.json();
+                        const firstId = mainData.post_stream?.posts?.[0]?.id;
+                        if (firstId && !pIds.includes(firstId)) {
+                            pIds.unshift(firstId);
+                        }
+                    }
+                }
+
+                if (pIds.length === 0) {
+                    throw new Error('没有找到帖子内容');
+                }
+
+                const posts = [];
+                const totalBatches = Math.ceil(pIds.length / 200);
+                
+                // 分批获取帖子详情（每批200条）
+                for (let i = 0; i < pIds.length; i += 200) {
+                    // 检查是否已中止
+                    if (abortSignal?.aborted) {
+                        throw new Error('导出已取消');
+                    }
+
+                    const batchNum = Math.floor(i / 200) + 1;
+                    progressCallback?.(`正在获取帖子内容 (${batchNum}/${totalBatches})...`);
+                    
+                    const chunk = pIds.slice(i, i + 200);
+                    const q = chunk.map(id => `post_ids[]=${id}`).join('&');
+                    const res = await fetch(`${location.origin}/t/${topicId}/posts.json?${q}&include_suggested=false`, opts);
+                    if (!res.ok) throw new Error(`获取帖子详情失败 (${res.status})`);
+                    const data = await res.json();
+
+                    for (const p of data.post_stream.posts) {
+                        // 检查是否已中止
+                        if (abortSignal?.aborted) {
+                            throw new Error('导出已取消');
+                        }
+
+                        const post = {
+                            postId: p.id,
+                            postNumber: p.post_number,
+                            author: {
+                                username: p.username,
+                                name: p.name || p.username,
+                                avatarUrl: p.avatar_template ? p.avatar_template.replace('{size}', '90') : ''
+                            },
+                            timestamp: p.created_at,
+                            content: p.cooked || '',
+                            replyTo: p.reply_to_post_number ? {
+                                postNumber: p.reply_to_post_number,
+                                username: p.reply_to_user?.username || ''
+                            } : null,
+                            likeCount: p.actions_summary?.find(a => a.id === 2)?.count || 0
+                        };
+
+                        // 如果需要嵌入图片，转换为 base64
+                        if (this._embedImages) {
+                            post.content = await this._processContentImages(post.content);
+                            if (post.author.avatarUrl) {
+                                const fullUrl = post.author.avatarUrl.startsWith('http') ? 
+                                    post.author.avatarUrl : `${location.origin}${post.author.avatarUrl}`;
+                                post.author.avatarUrl = await this._imageToBase64(fullUrl);
+                            }
+                        }
+
+                        posts.push(post);
+                    }
+                }
+
+                return posts;
+            }
+
+            // 图片转 base64
+            async _imageToBase64(url) {
+                try {
+                    const response = await fetch(url);
+                    const blob = await response.blob();
+                    return new Promise((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onloadend = () => resolve(reader.result);
+                        reader.onerror = reject;
+                        reader.readAsDataURL(blob);
+                    });
+                } catch (error) {
+                    return url; // 失败时返回原始URL
+                }
+            }
+
+            // 处理内容中的图片
+            async _processContentImages(content) {
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = content;
+                const images = tempDiv.querySelectorAll('img');
+                
+                for (const img of images) {
+                    const src = img.getAttribute('src');
+                    if (src && !src.startsWith('data:')) {
+                        const fullUrl = src.startsWith('http') ? src : `${location.origin}${src}`;
+                        try {
+                            const base64 = await this._imageToBase64(fullUrl);
+                            img.setAttribute('src', base64);
+                        } catch (e) {
+                            // 忽略转换失败的图片
+                        }
+                    }
+                }
+                
+                return tempDiv.innerHTML;
+            }
+
+            async _renderHome(forceRefresh = false) {
+                const body = this.overlay.querySelector('.ldsp-export-body');
+                const topicId = this._getTopicId();
+
+                if (!topicId) {
+                    this._startUrlWatch();
+                    body.innerHTML = `
+                        <div class="ldsp-export-not-topic">
+                            <div class="ldsp-export-not-topic-icon">📄</div>
+                            <div class="ldsp-export-not-topic-text">请先进入一个话题帖子<br>才能使用导出功能哦~</div>
+                        </div>`;
+                    return;
+                }
+
+                this._stopUrlWatch();
+                body.innerHTML = `<div class="ldsp-export-status"><div class="ldsp-export-status-icon">⏳</div>正在获取话题信息...</div>`;
+
+                const info = await this._getTopicInfo(forceRefresh);
+                if (!info) {
+                    body.innerHTML = `<div class="ldsp-export-status"><div class="ldsp-export-status-icon">❌</div>获取话题信息失败</div>`;
+                    return;
+                }
+
+                const totalPosts = info.postsCount || 1;
+                const rangeHint = totalPosts > 100 ? `共${totalPosts}楼，内容较多可能需要较长时间` : `共${totalPosts}楼`;
+
+                // 生成分类和标签 HTML
+                let tagsHtml = '';
+                if (info.category || (info.tags && info.tags.length > 0)) {
+                    const categoryHtml = info.category ? 
+                        `<span class="ldsp-export-info-category" ${info.categoryColor ? `style="background:#${info.categoryColor}"` : ''}>📁 ${Utils.escapeHtml(info.category)}</span>` : '';
+                    const tagItemsHtml = (info.tags || []).map(tag => 
+                        `<span class="ldsp-export-info-tag">🏷️ ${Utils.escapeHtml(tag)}</span>`
+                    ).join('');
+                    tagsHtml = `<div class="ldsp-export-info-tags">${categoryHtml}${tagItemsHtml}</div>`;
+                }
+
+                body.innerHTML = `
+                    <div class="ldsp-export-info">
+                        <div class="ldsp-export-info-title">📋 ${Utils.escapeHtml(info.title)}</div>
+                        ${tagsHtml}
+                        <div class="ldsp-export-info-row">
+                            <span class="ldsp-export-info-label">话题ID</span>
+                            <span class="ldsp-export-info-value">${info.id}</span>
+                        </div>
+                        <div class="ldsp-export-info-row">
+                            <span class="ldsp-export-info-label">总楼层</span>
+                            <span class="ldsp-export-info-value">${totalPosts} 楼</span>
+                        </div>
+                        ${info.views ? `<div class="ldsp-export-info-row">
+                            <span class="ldsp-export-info-label">浏览量</span>
+                            <span class="ldsp-export-info-value">${info.views.toLocaleString()}</span>
+                        </div>` : ''}
+                    </div>
+                    <div class="ldsp-export-range">
+                        <span class="ldsp-export-range-label">楼层范围</span>
+                        <input type="number" class="ldsp-export-range-input" id="export-start" value="1" min="1" max="${totalPosts}">
+                        <span class="ldsp-export-range-sep">~</span>
+                        <input type="number" class="ldsp-export-range-input" id="export-end" value="${totalPosts}" min="1" max="${totalPosts}">
+                        <span class="ldsp-export-range-hint">${rangeHint}</span>
+                    </div>
+                    <div class="ldsp-export-format-selector">
+                        <div class="ldsp-export-format-title">导出格式</div>
+                        <div class="ldsp-export-format-cards">
+                            <label class="ldsp-export-format-card ${this._selectedFormat === 'html' ? 'active' : ''}" data-format="html">
+                                <input type="radio" name="export-format" value="html" ${this._selectedFormat === 'html' ? 'checked' : ''}>
+                                <div class="ldsp-export-format-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg></div>
+                                <div class="ldsp-export-format-card-name">HTML</div>
+                            </label>
+                            <label class="ldsp-export-format-card ${this._selectedFormat === 'pdf' ? 'active' : ''}" data-format="pdf">
+                                <input type="radio" name="export-format" value="pdf" ${this._selectedFormat === 'pdf' ? 'checked' : ''}>
+                                <div class="ldsp-export-format-card-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" fill="#ef4444" stroke="#dc2626" stroke-width="1"/><polyline points="14 2 14 8 20 8" fill="#fca5a5" stroke="#dc2626" stroke-width="1"/><text x="12" y="16" font-size="6" font-weight="bold" fill="#fff" text-anchor="middle" font-family="Arial">PDF</text></svg></div>
+                                <div class="ldsp-export-format-card-name">PDF</div>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="ldsp-export-options">
+                        <div class="ldsp-export-options-title">导出选项</div>
+                        <div class="ldsp-export-option">
+                            <input type="checkbox" id="export-embed-images" ${this._embedImages ? 'checked' : ''}>
+                            <label for="export-embed-images">嵌入图片（文件更大但可离线查看）</label>
+                        </div>
+                    </div>
+                    <div class="ldsp-export-actions">
+                        <button class="ldsp-export-btn-start" id="export-start-btn">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                            <span>开始导出</span>
+                        </button>
+                    </div>
+                    <div class="ldsp-export-status" id="export-status" style="display:none;"></div>`;
+
+                // 绑定格式选择
+                body.querySelectorAll('.ldsp-export-format-card').forEach(card => {
+                    card.addEventListener('click', () => {
+                        body.querySelectorAll('.ldsp-export-format-card').forEach(c => c.classList.remove('active'));
+                        card.classList.add('active');
+                        this._selectedFormat = card.dataset.format;
+                    });
+                });
+
+                // 绑定嵌入图片选项
+                body.querySelector('#export-embed-images').addEventListener('change', e => {
+                    this._embedImages = e.target.checked;
+                });
+
+                // 绑定导出按钮
+                body.querySelector('#export-start-btn').addEventListener('click', () => this._doExport(info));
+            }
+
+            async _doExport(topicInfo) {
+                const body = this.overlay.querySelector('.ldsp-export-body');
+                const actionsDiv = body.querySelector('.ldsp-export-actions');
+                const statusDiv = body.querySelector('#export-status');
+                const startInput = body.querySelector('#export-start');
+                const endInput = body.querySelector('#export-end');
+
+                const start = parseInt(startInput.value) || 1;
+                const end = parseInt(endInput.value) || topicInfo.postsCount;
+                const format = this._selectedFormat;
+
+                if (start > end) {
+                    this.renderer?.showToast('❌ 起始楼层不能大于结束楼层');
+                    return;
+                }
+
+                // 创建 AbortController 用于停止
+                this._abortController = new AbortController();
+                this._isExporting = true;
+
+                // 切换为停止按钮
+                actionsDiv.innerHTML = `
+                    <button class="ldsp-export-btn-stop" id="export-stop-btn">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>
+                        <span>停止导出</span>
+                    </button>`;
+                
+                body.querySelector('#export-stop-btn').addEventListener('click', () => {
+                    this._abortController?.abort();
+                    this._isExporting = false;
+                });
+
+                statusDiv.style.display = 'block';
+
+                const updateStatus = (msg) => {
+                    statusDiv.innerHTML = `<div class="ldsp-export-status-icon">⏳</div>${msg}`;
+                };
+
+                try {
+                    updateStatus('正在获取帖子内容...');
+                    const posts = await this._fetchPosts(topicInfo.id, start, end, updateStatus, this._abortController.signal);
+
+                    if (this._abortController.signal.aborted) {
+                        throw new Error('导出已取消');
+                    }
+
+                    if (posts.length === 0) {
+                        throw new Error('没有获取到帖子内容');
+                    }
+
+                    updateStatus('正在生成文件...');
+
+                    const exportData = {
+                        topic: topicInfo,
+                        posts: posts,
+                        exportDate: new Date().toISOString(),
+                        postCount: posts.length,
+                        range: { start, end }
+                    };
+
+                    if (format === 'html') {
+                        const html = this._generateHTML(exportData);
+                        const filename = this._generateFilename(topicInfo, 'html');
+                        this._downloadFile(html, filename, 'text/html');
+                    } else if (format === 'pdf') {
+                        // PDF 通过打印 HTML 实现
+                        const html = this._generateHTML(exportData, true);
+                        this._printToPDF(html, topicInfo);
+                    }
+
+                    statusDiv.innerHTML = `<div class="ldsp-export-status-icon">✅</div>导出成功！`;
+                    this.renderer?.showToast('✅ 导出成功！');
+
+                } catch (e) {
+                    const msg = e.name === 'AbortError' || e.message === '导出已取消' ? '导出已取消' : e.message;
+                    statusDiv.innerHTML = `<div class="ldsp-export-status-icon">${msg === '导出已取消' ? '⏹️' : '❌'}</div>${Utils.escapeHtml(msg)}`;
+                    if (msg !== '导出已取消') {
+                        this.renderer?.showToast(`❌ ${msg}`);
+                    }
+                } finally {
+                    this._isExporting = false;
+                    this._abortController = null;
+                    // 恢复开始按钮
+                    actionsDiv.innerHTML = `
+                        <button class="ldsp-export-btn-start" id="export-start-btn">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                            <span>开始导出</span>
+                        </button>`;
+                    body.querySelector('#export-start-btn').addEventListener('click', () => this._doExport(topicInfo));
+                }
+            }
+
+            _generateFilename(topicInfo, ext) {
+                const now = new Date();
+                const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+                const timeStr = `${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
+                // 清理标题中的非法文件名字符
+                const safeTitle = topicInfo.title.replace(/[<>:"/\\|?*]/g, '').substring(0, 50);
+                return `LDStatusPro_${topicInfo.id}_${safeTitle}_${dateStr}_${timeStr}.${ext}`;
+            }
+
+            _generateHTML(data, forPrint = false) {
+                const { topic, posts, exportDate, postCount, range } = data;
+                const now = new Date(exportDate);
+                const exportTimeStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+                
+                const title = `LDStatusPro 导出 - ${Utils.escapeHtml(topic.title)} - 话题#${topic.id} - ${exportTimeStr}`;
+
+                const postsHtml = posts.map(post => {
+                    const replyInfo = post.replyTo ? 
+                        `<div class="reply-to">回复 #${post.replyTo.postNumber} @${Utils.escapeHtml(post.replyTo.username)}</div>` : '';
+                    
+                    return `
+                    <div class="post" id="post-${post.postNumber}">
+                        <div class="post-header">
+                            ${post.author.avatarUrl ? `<img src="${post.author.avatarUrl}" alt="${Utils.escapeHtml(post.author.username)}" class="avatar">` : '<div class="avatar-placeholder"></div>'}
+                            <div class="author-info">
+                                <span class="author-name">${Utils.escapeHtml(post.author.name)}</span>
+                                <span class="author-username">@${Utils.escapeHtml(post.author.username)}</span>
+                                <span class="post-time">${new Date(post.timestamp).toLocaleString('zh-CN')}</span>
+                            </div>
+                            <span class="post-number">#${post.postNumber}</span>
+                        </div>
+                        ${replyInfo}
+                        <div class="post-content">${post.content}</div>
+                        ${post.likeCount > 0 ? `<div class="post-footer"><span class="like-count">❤️ ${post.likeCount}</span></div>` : ''}
+                    </div>`;
+                }).join('');
+
+                return `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${title}</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+            line-height: 1.6;
+            color: #1a1a1a;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+        .container { max-width: 900px; margin: 0 auto; }
+        .header {
+            background: linear-gradient(135deg, #6b8cef 0%, #5a7de0 100%);
+            color: #fff;
+            padding: 24px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 20px rgba(107, 140, 239, 0.3);
+        }
+        .header h1 { font-size: 20px; font-weight: 700; margin-bottom: 12px; line-height: 1.4; }
+        .meta { display: flex; flex-wrap: wrap; gap: 16px; font-size: 13px; opacity: 0.9; }
+        .meta-item { display: flex; align-items: center; gap: 4px; }
+        .badge {
+            background: rgba(255,255,255,0.2);
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .post {
+            background: #fff;
+            border-radius: 10px;
+            padding: 16px;
+            margin-bottom: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+        .post-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            object-fit: cover;
+            flex-shrink: 0;
+        }
+        .avatar-placeholder {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #e0e0e0, #c0c0c0);
+            flex-shrink: 0;
+        }
+        .author-info { flex: 1; min-width: 0; }
+        .author-name { font-weight: 600; color: #1a1a1a; margin-right: 6px; }
+        .author-username { color: #666; font-size: 13px; }
+        .post-time { color: #999; font-size: 12px; margin-left: 8px; }
+        .post-number {
+            background: #f0f0f0;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            color: #666;
+            font-weight: 500;
+        }
+        .reply-to {
+            background: #f8f9fa;
+            border-left: 3px solid #6b8cef;
+            padding: 8px 12px;
+            margin-bottom: 12px;
+            border-radius: 0 6px 6px 0;
+            font-size: 13px;
+            color: #666;
+        }
+        .post-content {
+            font-size: 15px;
+            line-height: 1.8;
+            word-wrap: break-word;
+        }
+        .post-content img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            margin: 8px 0;
+        }
+        .post-content blockquote, .post-content aside.quote {
+            background: #f8f9fa;
+            border-left: 3px solid #6b8cef;
+            padding: 12px 16px;
+            margin: 12px 0;
+            border-radius: 0 6px 6px 0;
+            color: #555;
+        }
+        .post-content pre {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 16px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        .post-content code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+        .post-content pre code { background: none; padding: 0; }
+        .post-content a { color: #6b8cef; text-decoration: none; }
+        .post-content a:hover { text-decoration: underline; }
+        .post-footer {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #f0f0f0;
+            font-size: 13px;
+            color: #666;
+        }
+        .like-count { color: #e74c3c; }
+        .topic-tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+        .topic-category {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 12px;
+            background: rgba(255,255,255,0.25);
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .topic-tag {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 10px;
+            background: rgba(255,255,255,0.15);
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: #999;
+            font-size: 12px;
+        }
+        .footer a { color: #6b8cef; text-decoration: none; }
+        @media print {
+            body { background: #fff; padding: 0; }
+            .header { box-shadow: none; page-break-after: avoid; }
+            .post { box-shadow: none; border: 1px solid #e0e0e0; page-break-inside: avoid; }
+        }
+        @media (max-width: 600px) {
+            body { padding: 10px; }
+            .header { padding: 16px; }
+            .header h1 { font-size: 16px; }
+            .meta { gap: 8px; font-size: 12px; }
+            .topic-tags { gap: 6px; margin-top: 10px; }
+            .post { padding: 12px; }
+            .post-header { gap: 8px; }
+            .avatar, .avatar-placeholder { width: 32px; height: 32px; }
+            .post-content { font-size: 14px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>${Utils.escapeHtml(topic.title)}</h1>
+            <div class="meta">
+                <span class="meta-item"><a href="https://github.com/caigg188/LDStatusPro" target="_blank" class="badge" style="color:#fff;text-decoration:none;">LDStatusPro</a></span>
+                <span class="meta-item">📋 话题 #${topic.id}</span>
+                <span class="meta-item">📝 ${postCount} 楼 (${range.start}-${range.end})</span>
+                ${topic.views ? `<span class="meta-item">👁️ ${topic.views.toLocaleString()} 浏览</span>` : ''}
+                <span class="meta-item">📅 ${exportTimeStr}</span>
+            </div>
+            ${(topic.category || (topic.tags && topic.tags.length > 0)) ? `
+            <div class="topic-tags">
+                ${topic.category ? `<span class="topic-category" ${topic.categoryColor ? `style="background:#${topic.categoryColor}"` : ''}>📁 ${Utils.escapeHtml(topic.category)}</span>` : ''}
+                ${(topic.tags || []).map(tag => `<span class="topic-tag">🏷️ ${Utils.escapeHtml(tag)}</span>`).join('')}
+            </div>` : ''}
+        </div>
+        ${postsHtml}
+        <div class="footer">
+            由 <a href="https://github.com/caigg188/LDStatusPro" target="_blank">LDStatusPro</a> 导出 | 
+            来源: <a href="${location.origin}/t/${topic.id}" target="_blank">${location.origin}/t/${topic.id}</a>
+        </div>
+    </div>
+</body>
+</html>`;
+            }
+
+            _downloadFile(content, filename, type) {
+                const blob = new Blob([content], { type: type });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+
+            _printToPDF(html, topicInfo) {
+                // 创建新窗口用于打印
+                const printWindow = window.open('', '_blank');
+                if (!printWindow) {
+                    throw new Error('无法打开打印窗口，请检查弹窗拦截设置');
+                }
+                
+                printWindow.document.write(html);
+                printWindow.document.close();
+                
+                // 等待内容加载完成后打印
+                printWindow.onload = () => {
+                    setTimeout(() => {
+                        printWindow.print();
+                    }, 500);
+                };
+            }
+
+            destroy() {
+                this._stopUrlWatch();
+                if (this.overlay) {
+                    this.overlay.remove();
+                    this.overlay = null;
+                }
+            }
+        }
+
         // ==================== LDC 积分管理器 ====================
         // 仅在 linux.do 站点可用，用于显示 credit.linux.do 的积分信息
         class LDCManager {
@@ -4781,6 +5737,44 @@
                     timeRange: '7days', // today | 7days | 30days | all
                     type: '' // '' = 全部
                 };
+                // iOS Safari 检测
+                this._isIOSSafari = /iPad|iPhone|iPod/.test(navigator.userAgent) && 
+                    /WebKit/.test(navigator.userAgent) && 
+                    !/CriOS|FxiOS|OPiOS|EdgiOS/.test(navigator.userAgent);
+                this._storageAccessGranted = false;
+            }
+            
+            // 检测并请求 Storage Access（iOS Safari 跨站 Cookie 问题）
+            async _requestStorageAccess() {
+                // 非 iOS Safari 不需要
+                if (!this._isIOSSafari) return true;
+                
+                // 已授权
+                if (this._storageAccessGranted) return true;
+                
+                // 检查是否支持 Storage Access API
+                if (!document.hasStorageAccess || !document.requestStorageAccess) {
+                    Logger.warn('[LDCManager] Storage Access API not supported');
+                    return false;
+                }
+                
+                try {
+                    // 先检查是否已有权限
+                    const hasAccess = await document.hasStorageAccess();
+                    if (hasAccess) {
+                        this._storageAccessGranted = true;
+                        return true;
+                    }
+                    
+                    // 请求权限（需要用户交互触发）
+                    await document.requestStorageAccess();
+                    this._storageAccessGranted = true;
+                    Logger.info('[LDCManager] Storage access granted');
+                    return true;
+                } catch (e) {
+                    Logger.warn('[LDCManager] Storage access request failed:', e);
+                    return false;
+                }
             }
 
             init() {
@@ -4804,6 +5798,7 @@
                     <div class="ldsp-ldc-tabs">
                         <div class="ldsp-ldc-tab active" data-tab="overview">📊 概览</div>
                         <div class="ldsp-ldc-tab" data-tab="transactions">📜 交易记录</div>
+                        <div class="ldsp-ldc-tab" data-tab="support">❤️ 支持</div>
                     </div>
                     <div class="ldsp-ldc-body">
                         <div class="ldsp-ldc-loading">
@@ -4822,9 +5817,10 @@
                 this.overlay.querySelector('.ldsp-ldc-refresh').addEventListener('click', () => {
                     if (this._activeTab === 'overview') {
                         this._fetchData(true);
-                    } else {
+                    } else if (this._activeTab === 'transactions') {
                         this._fetchTransactions(true);
                     }
+                    // 支持页面不需要刷新
                 });
                 // Tab 切换
                 this.overlay.querySelectorAll('.ldsp-ldc-tab').forEach(tab => {
@@ -4858,8 +5854,10 @@
                     if (!this._loadCache()) {
                         this._fetchData();
                     }
-                } else {
+                } else if (tabId === 'transactions') {
                     this._fetchTransactions();
+                } else if (tabId === 'support') {
+                    this._renderSupportPage();
                 }
             }
 
@@ -4917,7 +5915,12 @@
                     // 获取用户信息
                     const userInfo = await this._fetchUserInfo();
                     if (!userInfo || userInfo._authError) {
-                        this._showError('请先登录 credit.linux.do', true);
+                        // iOS Safari 特殊处理：显示授权引导
+                        if (this._isIOSSafari) {
+                            this._showIOSAuthGuide();
+                        } else {
+                            this._showError('请先登录 credit.linux.do', true);
+                        }
                         return;
                     }
                     if (userInfo._timeoutError) {
@@ -4952,6 +5955,39 @@
                     this._isLoading = false;
                     refreshBtn?.classList.remove('spinning');
                 }
+            }
+            
+            // iOS Safari 限制提示界面
+            _showIOSAuthGuide() {
+                const body = this.overlay.querySelector('.ldsp-ldc-body');
+                const refreshBtn = this.overlay.querySelector('.ldsp-ldc-refresh');
+                refreshBtn?.classList.remove('spinning');
+                this._isLoading = false;
+                
+                body.innerHTML = `
+                    <div class="ldsp-ldc-ios-guide">
+                        <div class="ldsp-ldc-ios-icon">🔒</div>
+                        <div class="ldsp-ldc-ios-title">iOS Safari 隐私限制</div>
+                        <div class="ldsp-ldc-ios-desc">
+                            iOS Safari 的 <strong>智能防跟踪 (ITP)</strong> 功能会阻止跨站点 Cookie，导致无法在此处获取 LDC 数据。这是 Apple 的安全策略，非程序问题。
+                        </div>
+                        <div class="ldsp-ldc-ios-solutions">
+                            <div class="ldsp-ldc-ios-solution">
+                                <div class="ldsp-ldc-ios-solution-title">✅ 推荐方案</div>
+                                <div class="ldsp-ldc-ios-solution-desc">直接访问 LDC 官网查看积分</div>
+                                <a href="https://credit.linux.do/home" target="_blank" class="ldsp-ldc-ios-btn primary">
+                                    打开 LDC 官网 ↗
+                                </a>
+                            </div>
+                            <div class="ldsp-ldc-ios-solution alt">
+                                <div class="ldsp-ldc-ios-solution-title">🔄 备选方案</div>
+                                <div class="ldsp-ldc-ios-solution-desc">使用 Chrome、Edge 或 Firefox (iOS) 浏览器访问本页面</div>
+                            </div>
+                        </div>
+                        <div class="ldsp-ldc-ios-tip">
+                            💡 此限制仅影响 LDC 积分功能，其他功能正常使用
+                        </div>
+                    </div>`;
             }
 
             _fetchUserInfo() {
@@ -5328,6 +6364,76 @@
                 this._renderTransactionsUI();
             }
 
+            // 支持等级定义
+            static SUPPORT_TIERS = [
+                { 
+                    id: 1, 
+                    name: '再接再厉', 
+                    amount: 2, 
+                    icon: '🌱',
+                    url: 'https://credit.linux.do/paying/online?token=cf4a5cd58a11fe68a6191c5e3bcca9a34fb8f4eb951eca46bbb0a40042b7e0ea'
+                },
+                { 
+                    id: 2, 
+                    name: '做的不错', 
+                    amount: 5, 
+                    icon: '⭐',
+                    url: 'https://credit.linux.do/paying/online?token=8f4f08c0ceb719c922d105a3be4c2d6d890aa17b47b73fa756510aa1abdc1bf7'
+                },
+                { 
+                    id: 3, 
+                    name: '大力支持', 
+                    amount: 10, 
+                    icon: '🚀',
+                    badge: '热门',
+                    url: 'https://credit.linux.do/paying/online?token=7a3d6fb647a275b55c248ad58b546e02905f7a05c08579906773bd323c2e2242'
+                },
+                { 
+                    id: 4, 
+                    name: '社区贡献者', 
+                    amount: 50, 
+                    icon: '👑',
+                    badge: '尊享',
+                    url: 'https://credit.linux.do/paying/online?token=7a3d6fb647a275b55c248ad58b546e02905f7a05c08579906773bd323c2e2242'
+                }
+            ];
+
+            _renderSupportPage() {
+                const body = this.overlay.querySelector('.ldsp-ldc-body');
+                
+                const tiersHtml = LDCManager.SUPPORT_TIERS.map(tier => `
+                    <a href="${tier.url}" target="_blank" class="ldsp-ldc-support-card tier-${tier.id}" rel="noopener">
+                        ${tier.badge ? `<span class="ldsp-ldc-support-badge">${tier.badge}</span>` : ''}
+                        <div class="ldsp-ldc-support-icon">${tier.icon}</div>
+                        <div class="ldsp-ldc-support-name">${tier.name}</div>
+                        <div class="ldsp-ldc-support-amount">${tier.amount} <span>LDC</span></div>
+                    </a>
+                `).join('');
+
+                body.innerHTML = `
+                    <div class="ldsp-ldc-support">
+                        <div class="ldsp-ldc-support-header">
+                            <div class="ldsp-ldc-support-title">
+                                <span class="ldsp-ldc-support-heart">💖</span>
+                                支持 LDStatus Pro
+                            </div>
+                            <div class="ldsp-ldc-support-desc">
+                                感谢您使用 LDStatus Pro！<br>
+                                您的支持是我持续开发的动力
+                            </div>
+                        </div>
+                        <div class="ldsp-ldc-support-grid">
+                            ${tiersHtml}
+                        </div>
+                        <div class="ldsp-ldc-support-footer">
+                            <div class="ldsp-ldc-support-footer-text">
+                                🙏 每一份支持都将用于<em>服务器维护</em>和<em>功能开发</em><br>
+                                感谢社区每一位用户的信任与陪伴
+                            </div>
+                        </div>
+                    </div>`;
+            }
+
             _showOrderDetail(order) {
                 this._selectedOrder = order;
                 const body = this.overlay.querySelector('.ldsp-ldc-body');
@@ -5626,7 +6732,10 @@
                 this.overlay.innerHTML = `
                     <div class="ldsp-melon-header">
                         <div class="ldsp-melon-title">🍉 吃瓜助手</div>
-                        <div class="ldsp-melon-close">×</div>
+                        <div class="ldsp-melon-header-actions">
+                            <div class="ldsp-melon-refresh" title="刷新数据"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>刷新</div>
+                            <div class="ldsp-melon-close">×</div>
+                        </div>
                     </div>
                     <div class="ldsp-melon-tabs">
                         <div class="ldsp-melon-tab active" data-tab="home">首页</div>
@@ -5642,6 +6751,7 @@
 
             _bindEvents() {
                 this.overlay.querySelector('.ldsp-melon-close').addEventListener('click', () => this.hide());
+                this.overlay.querySelector('.ldsp-melon-refresh').addEventListener('click', () => this._handleRefresh());
                 document.addEventListener('keydown', e => {
                     if (e.key === 'Escape' && this.overlay.classList.contains('show')) this.hide();
                 });
@@ -5660,6 +6770,26 @@
                     });
                 });
                 
+            }
+
+            async _handleRefresh() {
+                const refreshBtn = this.overlay.querySelector('.ldsp-melon-refresh');
+                if (!refreshBtn || refreshBtn.classList.contains('disabled')) return;
+                
+                // 获取当前活动的标签页
+                const activeTab = this.overlay.querySelector('.ldsp-melon-tab.active');
+                const tabName = activeTab?.dataset.tab;
+                
+                // 清除缓存
+                this._topicCache = null;
+                
+                // 根据当前标签页刷新
+                if (tabName === 'home') {
+                    await this._renderHome(true);
+                } else if (tabName === 'history') {
+                    this._renderHistory();
+                }
+                // 设置页不需要刷新
             }
             
             // URL 监听 - 仅在面板打开且非话题页时启动
@@ -5899,7 +7029,7 @@
                 return text;
             }
 
-            _renderHome() {
+            async _renderHome(forceRefresh = false) {
                 const body = this.overlay.querySelector('.ldsp-melon-body');
                 const topicId = this._getTopicId();
 
@@ -5921,118 +7051,114 @@
                 // 先显示加载状态
                 body.innerHTML = `<div class="ldsp-melon-status"><div class="ldsp-melon-status-icon">⏳</div>正在获取话题信息...</div>`;
 
-                this._getTopicInfo().then(info => {
-                    if (!info) {
-                        body.innerHTML = `<div class="ldsp-melon-error">❌ 获取话题信息失败，请刷新页面后重试</div>`;
-                        return;
-                    }
+                const info = await this._getTopicInfo(forceRefresh);
+                if (!info) {
+                    body.innerHTML = `<div class="ldsp-melon-error">❌ 获取话题信息失败，请刷新页面后重试</div>`;
+                    return;
+                }
 
-                    const totalPosts = info.postsCount || 1;
-                    const defaultEnd = totalPosts;
-                    const rangeHint = totalPosts > 100 ? `共${totalPosts}楼，内容较多可能需要较长时间` : `共${totalPosts}楼`;
+                const totalPosts = info.postsCount || 1;
+                const defaultEnd = totalPosts;
+                const rangeHint = totalPosts > 100 ? `共${totalPosts}楼，内容较多可能需要较长时间` : `共${totalPosts}楼`;
 
-                    // 检查是否已配置 API
-                    const hasConfig = this.config.apiUrl && this.config.apiKey;
+                // 检查是否已配置 API
+                const hasConfig = this.config.apiUrl && this.config.apiKey;
 
-                    body.innerHTML = `
-                        <div class="ldsp-melon-info">
-                            <div class="ldsp-melon-info-title">📋 ${Utils.escapeHtml(info.title)}</div>
-                            <div class="ldsp-melon-info-row">
-                                <span class="ldsp-melon-info-label">总楼层</span>
-                                <span class="ldsp-melon-info-value">${totalPosts} 楼</span>
-                            </div>
-                            ${info.views ? `<div class="ldsp-melon-info-row">
-                                <span class="ldsp-melon-info-label">浏览量</span>
-                                <span class="ldsp-melon-info-value">${info.views.toLocaleString()}</span>
-                            </div>` : ''}
-                            ${info.likeCount ? `<div class="ldsp-melon-info-row">
-                                <span class="ldsp-melon-info-label">点赞数</span>
-                                <span class="ldsp-melon-info-value">${info.likeCount}</span>
-                            </div>` : ''}
+                body.innerHTML = `
+                    <div class="ldsp-melon-info">
+                        <div class="ldsp-melon-info-title">📋 ${Utils.escapeHtml(info.title)}</div>
+                        <div class="ldsp-melon-info-row">
+                            <span class="ldsp-melon-info-label">总楼层</span>
+                            <span class="ldsp-melon-info-value">${totalPosts} 楼</span>
                         </div>
-                        ${!hasConfig ? `<div class="ldsp-melon-warning">⚠️ 请先在「设置」中配置 API 信息</div>` : ''}
-                        <div class="ldsp-melon-range">
-                            <span class="ldsp-melon-range-label">楼层范围</span>
-                            <input type="number" class="ldsp-melon-range-input" id="melon-start" value="1" min="1" max="${totalPosts}">
-                            <span class="ldsp-melon-range-sep">~</span>
-                            <input type="number" class="ldsp-melon-range-input" id="melon-end" value="${defaultEnd}" min="1" max="${totalPosts}">
-                            <span class="ldsp-melon-range-hint">${rangeHint}</span>
-                        </div>
-                        <div class="ldsp-melon-mode-selector">
-                            <span class="ldsp-melon-mode-label">总结模式</span>
-                            <div class="ldsp-melon-mode-cards">
-                                <label class="ldsp-melon-mode-card ${this._summaryMode === 'brief' ? 'active' : ''}">
-                                    <input type="radio" name="melon-mode" value="brief" ${this._summaryMode === 'brief' ? 'checked' : ''}>
-                                    <div class="ldsp-melon-mode-card-icon">⚡</div>
-                                    <div class="ldsp-melon-mode-card-content">
-                                        <div class="ldsp-melon-mode-card-title">简略模式</div>
-                                        <div class="ldsp-melon-mode-card-desc">~150字快速概要</div>
-                                    </div>
-                                </label>
-                                <label class="ldsp-melon-mode-card ${this._summaryMode === 'detailed' ? 'active' : ''}">
-                                    <input type="radio" name="melon-mode" value="detailed" ${this._summaryMode === 'detailed' ? 'checked' : ''}>
-                                    <div class="ldsp-melon-mode-card-icon">📊</div>
-                                    <div class="ldsp-melon-mode-card-content">
-                                        <div class="ldsp-melon-mode-card-title">详细模式</div>
-                                        <div class="ldsp-melon-mode-card-desc">完整结构化分析</div>
-                                    </div>
-                                </label>
-                            </div>
-                        </div>
-                        <div class="ldsp-melon-actions">
-                            <button class="ldsp-melon-btn-summarize" id="melon-summarize" ${!hasConfig ? 'disabled' : ''}>
-                                <span>🍉</span>
-                                <span>立即吃瓜</span>
-                            </button>
-                        </div>
-                        <div class="ldsp-melon-output-wrapper">
-                            <div class="ldsp-melon-output-header" style="display:none;">
-                                <span class="ldsp-melon-output-title">📝 总结结果</span>
-                                <div class="ldsp-melon-output-actions">
-                                    <button class="ldsp-melon-resize-btn" id="melon-expand" title="在新窗口中展开查看">
-                                        <span>🔍</span>
-                                        <span>展开</span>
-                                    </button>
-                                    <button class="ldsp-melon-copy-btn" id="melon-copy" title="复制到剪贴板">
-                                        <span>📋</span>
-                                        <span>复制</span>
-                                    </button>
+                        ${info.views ? `<div class="ldsp-melon-info-row">
+                            <span class="ldsp-melon-info-label">浏览量</span>
+                            <span class="ldsp-melon-info-value">${info.views.toLocaleString()}</span>
+                        </div>` : ''}
+                        ${info.likeCount ? `<div class="ldsp-melon-info-row">
+                            <span class="ldsp-melon-info-label">点赞数</span>
+                            <span class="ldsp-melon-info-value">${info.likeCount}</span>
+                        </div>` : ''}
+                    </div>
+                    ${!hasConfig ? `<div class="ldsp-melon-warning">⚠️ 请先在「设置」中配置 API 信息</div>` : ''}
+                    <div class="ldsp-melon-range">
+                        <span class="ldsp-melon-range-label">楼层范围</span>
+                        <input type="number" class="ldsp-melon-range-input" id="melon-start" value="1" min="1" max="${totalPosts}">
+                        <span class="ldsp-melon-range-sep">~</span>
+                        <input type="number" class="ldsp-melon-range-input" id="melon-end" value="${defaultEnd}" min="1" max="${totalPosts}">
+                        <span class="ldsp-melon-range-hint">${rangeHint}</span>
+                    </div>
+                    <div class="ldsp-melon-mode-selector">
+                        <span class="ldsp-melon-mode-label">总结模式</span>
+                        <div class="ldsp-melon-mode-cards">
+                            <label class="ldsp-melon-mode-card ${this._summaryMode === 'brief' ? 'active' : ''}">
+                                <input type="radio" name="melon-mode" value="brief" ${this._summaryMode === 'brief' ? 'checked' : ''}>
+                                <div class="ldsp-melon-mode-card-icon">⚡</div>
+                                <div class="ldsp-melon-mode-card-content">
+                                    <div class="ldsp-melon-mode-card-title">简略模式</div>
+                                    <div class="ldsp-melon-mode-card-desc">~150字快速概要</div>
                                 </div>
+                            </label>
+                            <label class="ldsp-melon-mode-card ${this._summaryMode === 'detailed' ? 'active' : ''}">
+                                <input type="radio" name="melon-mode" value="detailed" ${this._summaryMode === 'detailed' ? 'checked' : ''}>
+                                <div class="ldsp-melon-mode-card-icon">📊</div>
+                                <div class="ldsp-melon-mode-card-content">
+                                    <div class="ldsp-melon-mode-card-title">详细模式</div>
+                                    <div class="ldsp-melon-mode-card-desc">完整结构化分析</div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="ldsp-melon-actions">
+                        <button class="ldsp-melon-btn-summarize" id="melon-summarize" ${!hasConfig ? 'disabled' : ''}>
+                            <span>🍉</span>
+                            <span>立即吃瓜</span>
+                        </button>
+                    </div>
+                    <div class="ldsp-melon-output-wrapper">
+                        <div class="ldsp-melon-output-header" style="display:none;">
+                            <span class="ldsp-melon-output-title">📝 总结结果</span>
+                            <div class="ldsp-melon-output-actions">
+                                <button class="ldsp-melon-resize-btn" id="melon-expand" title="在新窗口中展开查看">
+                                    <span>🔍</span>
+                                    <span>展开</span>
+                                </button>
+                                <button class="ldsp-melon-copy-btn" id="melon-copy" title="复制到剪贴板">
+                                    <span>📋</span>
+                                    <span>复制</span>
+                                </button>
                             </div>
-                            <div class="ldsp-melon-output" id="melon-output"></div>
-                        </div>`;
+                        </div>
+                        <div class="ldsp-melon-output" id="melon-output"></div>
+                    </div>`;
 
-                    // 绑定模式选择
-                    body.querySelectorAll('input[name="melon-mode"]').forEach(radio => {
-                        radio.addEventListener('change', (e) => {
-                            this._summaryMode = e.target.value;
-                            // 更新卡片active状态
-                            body.querySelectorAll('.ldsp-melon-mode-card').forEach(card => {
-                                card.classList.toggle('active', card.querySelector('input').value === e.target.value);
-                            });
+                // 绑定模式选择
+                body.querySelectorAll('input[name="melon-mode"]').forEach(radio => {
+                    radio.addEventListener('change', (e) => {
+                        this._summaryMode = e.target.value;
+                        // 更新卡片active状态
+                        body.querySelectorAll('.ldsp-melon-mode-card').forEach(card => {
+                            card.classList.toggle('active', card.querySelector('input').value === e.target.value);
                         });
                     });
-
-                    // 绑定复制按钮
-                    body.querySelector('#melon-copy').addEventListener('click', () => this._copyOutput());
-                    
-                    // 绑定展开按钮 - 打开独立大窗口
-                    body.querySelector('#melon-expand').addEventListener('click', () => {
-                        if (this._currentOutput) {
-                            this._showViewer({
-                                title: info.title,
-                                summary: this._currentOutput,
-                                mode: this._summaryMode,
-                                topicId: info.id
-                            });
-                        }
-                    });
-
-                    body.querySelector('#melon-summarize').addEventListener('click', () => this._doSummarize(info));
-                }).catch(e => {
-                    Logger.error('[MelonHelper] Render home error:', e);
-                    body.innerHTML = `<div class="ldsp-melon-error">❌ 获取话题信息失败: ${Utils.escapeHtml(e.message)}</div>`;
                 });
+
+                // 绑定复制按钮
+                body.querySelector('#melon-copy').addEventListener('click', () => this._copyOutput());
+                
+                // 绑定展开按钮 - 打开独立大窗口
+                body.querySelector('#melon-expand').addEventListener('click', () => {
+                    if (this._currentOutput) {
+                        this._showViewer({
+                            title: info.title,
+                            summary: this._currentOutput,
+                            mode: this._summaryMode,
+                            topicId: info.id
+                        });
+                    }
+                });
+
+                body.querySelector('#melon-summarize').addEventListener('click', () => this._doSummarize(info));
             }
 
             async _copyOutput() {
@@ -6337,6 +7463,12 @@
                 
                 body.innerHTML = `
                     <div class="ldsp-melon-settings">
+                        <div class="ldsp-melon-setting-security">
+                            <div class="ldsp-melon-setting-security-icon">🔒</div>
+                            <div class="ldsp-melon-setting-security-text">
+                                <strong>数据安全</strong> · 您的 API Key 等配置仅保存在浏览器本地，不会上传至任何服务器
+                            </div>
+                        </div>
                         <div class="ldsp-melon-setting-group">
                             <div class="ldsp-melon-setting-title">🔑 API 配置</div>
                             <div class="ldsp-melon-setting-row">
@@ -6345,7 +7477,7 @@
                                     placeholder="https://api.openai.com/v1/chat/completions" 
                                     value="${Utils.escapeHtml(this.config.apiUrl || '')}"
                                     ${!isEditing ? 'disabled' : ''}>
-                                <div class="ldsp-melon-setting-hint">支持 OpenAI 兼容格式的 API（如 OpenRouter、DeepSeek、Claude 等）</div>
+                                <div class="ldsp-melon-setting-hint">⚠️ 完整格式: https://xxxxxx<strong>/v1/chat/completions</strong>（别漏掉后缀）</div>
                             </div>
                             <div class="ldsp-melon-setting-row">
                                 <label class="ldsp-melon-setting-label">API Key <span style="color:var(--err)">*</span></label>
@@ -6357,57 +7489,53 @@
                             <div class="ldsp-melon-setting-row">
                                 <label class="ldsp-melon-setting-label">模型名称</label>
                                 <input type="text" class="ldsp-melon-setting-input" id="melon-model" 
-                                    placeholder="gpt-4o-mini" 
+                                    placeholder="gemini-2.0-flash" 
                                     value="${Utils.escapeHtml(this.config.model || 'gpt-4o-mini')}"
                                     ${!isEditing ? 'disabled' : ''}>
-                                <div class="ldsp-melon-setting-hint">推荐: gpt-4o-mini, deepseek-chat, claude-3-haiku-20240307 等</div>
+                                <div class="ldsp-melon-setting-hint">只填一个模型名，推荐: <strong>gemini-2.0-flash</strong>、<strong>claude-3-haiku</strong>、<strong>deepseek-v3</strong></div>
+                            </div>
+                            <div class="ldsp-melon-setting-actions">
+                                ${isEditing ? `
+                                    <button class="ldsp-melon-setting-btn ldsp-melon-btn-save" id="melon-save-settings">💾 保存配置</button>
+                                ` : `
+                                    <button class="ldsp-melon-setting-btn ldsp-melon-btn-edit" id="melon-edit-settings">✏️ 修改配置</button>
+                                `}
                             </div>
                         </div>
-                        <div class="ldsp-melon-setting-actions">
-                            ${isEditing ? `
-                                <button class="ldsp-melon-setting-btn ldsp-melon-btn-save" id="melon-save-settings">💾 保存设置</button>
-                            ` : `
-                                <button class="ldsp-melon-setting-btn ldsp-melon-btn-edit" id="melon-edit-settings">✏️ 编辑设置</button>
-                            `}
-                        </div>
                         <div class="ldsp-melon-setting-group">
-                            <div class="ldsp-melon-setting-title">📝 自定义提示词</div>
-                            <div class="ldsp-melon-setting-hint" style="margin-bottom:10px">自定义 AI 总结的提示词，留空则使用默认提示词</div>
+                            <div class="ldsp-melon-setting-title">📝 自定义提示词 <span class="ldsp-melon-setting-subtitle">（可选，留空用默认）</span></div>
                             <div class="ldsp-melon-setting-row">
                                 <label class="ldsp-melon-setting-label">
-                                    简略模式提示词
+                                    简略模式
                                     <span class="ldsp-melon-prompt-reset" data-prompt="brief" title="清空并恢复默认">🗑️</span>
+                                    <span class="ldsp-melon-prompt-status ${this.config.promptBrief ? 'custom' : ''}">${this.config.promptBrief ? '✅ 已自定义' : '默认'}</span>
                                 </label>
                                 <textarea class="ldsp-melon-setting-textarea" id="melon-prompt-brief" 
                                     placeholder="${Utils.escapeHtml(MelonHelper.PROMPT_BRIEF.trim())}"
-                                    rows="5">${Utils.escapeHtml(this.config.promptBrief || '')}</textarea>
-                                <div class="ldsp-melon-setting-hint">${this.config.promptBrief ? '✅ 已自定义' : '💡 使用默认提示词'}</div>
+                                    rows="4">${Utils.escapeHtml(this.config.promptBrief || '')}</textarea>
                             </div>
                             <div class="ldsp-melon-setting-row">
                                 <label class="ldsp-melon-setting-label">
-                                    详细模式提示词
+                                    详细模式
                                     <span class="ldsp-melon-prompt-reset" data-prompt="detailed" title="清空并恢复默认">🗑️</span>
+                                    <span class="ldsp-melon-prompt-status ${this.config.promptDetailed ? 'custom' : ''}">${this.config.promptDetailed ? '✅ 已自定义' : '默认'}</span>
                                 </label>
                                 <textarea class="ldsp-melon-setting-textarea" id="melon-prompt-detailed" 
                                     placeholder="${Utils.escapeHtml(MelonHelper.PROMPT_DETAILED.trim())}"
-                                    rows="8">${Utils.escapeHtml(this.config.promptDetailed || '')}</textarea>
-                                <div class="ldsp-melon-setting-hint">${this.config.promptDetailed ? '✅ 已自定义' : '💡 使用默认提示词'}</div>
+                                    rows="6">${Utils.escapeHtml(this.config.promptDetailed || '')}</textarea>
                             </div>
-                            <div class="ldsp-melon-setting-prompt-actions">
+                            <div class="ldsp-melon-setting-actions">
                                 <button class="ldsp-melon-setting-btn ldsp-melon-btn-prompt" id="melon-save-prompts">💾 保存提示词</button>
                             </div>
                         </div>
-                        <div class="ldsp-melon-setting-security">
-                            <div class="ldsp-melon-setting-security-icon">🔒</div>
-                            <div class="ldsp-melon-setting-security-text">
-                                <strong>数据安全说明</strong><br>
-                                您的 API Key 等配置信息仅保存在浏览器本地存储中，不会上传到任何服务器。请放心使用。
-                            </div>
-                        </div>
                         <div class="ldsp-melon-setting-group ldsp-melon-setting-danger">
-                            <div class="ldsp-melon-setting-title">🗑️ 数据清理</div>
-                            <div class="ldsp-melon-setting-danger-desc">清空所有本地存储的数据，包括 API 配置和历史记录</div>
-                            <button class="ldsp-melon-setting-btn ldsp-melon-btn-danger" id="melon-clear-all-data">🗑️ 清空所有数据</button>
+                            <div class="ldsp-melon-setting-danger-content">
+                                <div class="ldsp-melon-setting-danger-info">
+                                    <div class="ldsp-melon-setting-title">🗑️ 重置配置</div>
+                                    <div class="ldsp-melon-setting-danger-desc">清空 API 配置和自定义提示词</div>
+                                </div>
+                                <button class="ldsp-melon-setting-btn ldsp-melon-btn-danger" id="melon-clear-all-data">重置</button>
+                            </div>
                         </div>
                     </div>`;
 
@@ -6479,16 +7607,14 @@
                     });
                 });
                 
-                // 清空数据按钮
+                // 重置配置按钮（只清空配置和提示词，不清空历史记录）
                 body.querySelector('#melon-clear-all-data')?.addEventListener('click', () => {
-                    this._showConfirm('确定要清空所有数据吗？<br>包括 API 配置、提示词和历史记录，此操作不可撤销。', () => {
-                        // 清空配置
+                    this._showConfirm('确定要重置配置吗？<br>将清空 API 配置和自定义提示词，历史记录不受影响。', () => {
+                        // 清空配置和提示词
                         this.config = { apiUrl: '', apiKey: '', model: 'gpt-4o-mini', promptBrief: '', promptDetailed: '' };
                         this._saveConfig();
-                        // 清空历史
-                        this._clearHistory();
                         this._isEditing = false;
-                        this.renderer?.showToast('✅ 所有数据已清空');
+                        this.renderer?.showToast('✅ 配置已重置');
                         this._renderSettings();
                     });
                 });
@@ -8972,6 +10098,10 @@
                 this.melonHelper = new MelonHelper(this.$.panelBody, this.renderer);
                 this.melonHelper.init();
 
+                // 帖子导出器初始化
+                this.topicExporter = new TopicExporter(this.$.panelBody, this.renderer);
+                this.topicExporter.init();
+
                 // LDC 积分管理器初始化（仅 linux.do）
                 if (CURRENT_SITE.domain === 'linux.do') {
                     this.ldcManager = new LDCManager(this.$.panelBody, this.renderer);
@@ -9146,12 +10276,16 @@
                                     </div>
                                     <span class="ldsp-join-days">来<span class="ldsp-join-days-site"></span><span class="ldsp-join-days-num">-</span>天</span>
                                 </div>
-                                <div class="ldsp-user-actions">
-                                    <div class="ldsp-action-btn ldsp-login-btn" data-clickable title="点击登录"><span class="ldsp-action-icon">🔑</span><span class="ldsp-action-text">点击登录</span></div>
-                                    <div class="ldsp-action-btn ldsp-logout-btn" data-clickable title="注销登录"><span class="ldsp-action-icon">⏻</span><span class="ldsp-action-text">注销</span></div>
-                                    <div class="ldsp-action-btn ldsp-ticket-btn" data-clickable title="工单系统"><span class="ldsp-action-icon">📪</span><span class="ldsp-action-text">工单</span></div>
-                                    <div class="ldsp-action-btn ldsp-melon-btn" data-clickable title="AI 帖子总结"><span class="ldsp-action-icon">🍉</span><span class="ldsp-action-text">总结</span></div>
-                                    ${CURRENT_SITE.domain === 'linux.do' ? '<div class="ldsp-action-btn ldsp-ldc-btn" data-clickable title="Linux Do Credit"><span class="ldsp-action-icon">🍟</span><span class="ldsp-action-text">LDC</span></div>' : ''}
+                                <div class="ldsp-user-actions-wrap">
+                                    <div class="ldsp-user-actions collapsed">
+                                        <div class="ldsp-action-btn ldsp-login-btn" data-clickable title="点击登录"><span class="ldsp-action-icon">🔑</span><span class="ldsp-action-text">点击登录</span></div>
+                                        <div class="ldsp-action-btn ldsp-logout-btn" data-clickable title="注销登录"><span class="ldsp-action-icon">⏻</span><span class="ldsp-action-text">注销</span></div>
+                                        ${CURRENT_SITE.domain === 'linux.do' ? '<div class="ldsp-action-btn ldsp-ldc-btn" data-clickable title="Linux Do Credit"><span class="ldsp-action-icon">🍟</span><span class="ldsp-action-text">LDC</span></div>' : ''}
+                                        <div class="ldsp-action-btn ldsp-melon-btn" data-clickable title="AI 帖子总结"><span class="ldsp-action-icon">🍉</span><span class="ldsp-action-text">总结</span></div>
+                                        <div class="ldsp-action-btn ldsp-export-btn" data-clickable title="导出帖子为PDF/HTML"><span class="ldsp-action-icon">📥</span><span class="ldsp-action-text">导出</span></div>
+                                        <div class="ldsp-action-btn ldsp-ticket-btn" data-clickable title="工单系统"><span class="ldsp-action-icon">📪</span><span class="ldsp-action-text">工单</span></div>
+                                    </div>
+                                    <div class="ldsp-user-actions-toggle" data-clickable title="展开更多按钮"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg><span class="ldsp-toggle-text">展开更多</span></div>
                                 </div>
                             </div>
                             <div class="ldsp-reading" data-clickable title="点击访问 LDStatus Pro 官网">
@@ -9206,9 +10340,12 @@
                     userHandle: this.el.querySelector('.ldsp-user-handle'),
                     ticketBtn: this.el.querySelector('.ldsp-ticket-btn'),
                     melonBtn: this.el.querySelector('.ldsp-melon-btn'),
+                    exportBtn: this.el.querySelector('.ldsp-export-btn'),
                     ldcBtn: this.el.querySelector('.ldsp-ldc-btn'),
                     logoutBtn: this.el.querySelector('.ldsp-logout-btn'),
                     loginBtn: this.el.querySelector('.ldsp-login-btn'),
+                    actionsArea: this.el.querySelector('.ldsp-user-actions'),
+                    actionsToggle: this.el.querySelector('.ldsp-user-actions-toggle'),
                     confirmOverlay: this.el.querySelector('.ldsp-confirm-overlay'),
                     confirmCancel: this.el.querySelector('.ldsp-confirm-btn.cancel'),
                     confirmOk: this.el.querySelector('.ldsp-confirm-btn.confirm'),
@@ -9242,19 +10379,32 @@
 
                 const getPos = e => e.touches ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : { x: e.clientX, y: e.clientY };
 
+                // 保存拖拽开始前的样式，以便在没有实际移动时恢复
+                let dragStartStyles = null;
+                
                 const startDrag = e => {
                     if (!this.el.classList.contains('collapsed') && e.target.closest('button')) return;
                     const p = getPos(e);
                     dragging = true;
                     moved = false;
-                    // 使用 left/top 进行拖拽计算
+                    // 获取当前位置
+                    const rect = this.el.getBoundingClientRect();
+                    
+                    // 保存拖拽开始前的样式
+                    dragStartStyles = {
+                        left: this.el.style.left,
+                        right: this.el.style.right,
+                        top: this.el.style.top
+                    };
+                    
+                    this.el.classList.add('no-trans');
+                    // 统一切换到 left 定位进行拖拽
+                    this.el.style.left = rect.left + 'px';
                     this.el.style.right = 'auto';
-                    this.el.style.left = this.el.offsetLeft + 'px';
-                    ox = p.x - this.el.offsetLeft;
-                    oy = p.y - this.el.offsetTop;
+                    ox = p.x - rect.left;
+                    oy = p.y - rect.top;
                     sx = p.x;
                     sy = p.y;
-                    this.el.classList.add('no-trans');
                     e.preventDefault();
                 };
 
@@ -9262,16 +10412,52 @@
                     if (!dragging) return;
                     const p = getPos(e);
                     if (Math.abs(p.x - sx) > THRESHOLD || Math.abs(p.y - sy) > THRESHOLD) moved = true;
-                    this.el.style.left = Math.max(0, Math.min(p.x - ox, innerWidth - this.el.offsetWidth)) + 'px';
-                    this.el.style.top = Math.max(0, Math.min(p.y - oy, innerHeight - this.el.offsetHeight)) + 'px';
+                    const { innerWidth: vw, innerHeight: vh } = window;
+                    const w = this.el.offsetWidth, h = this.el.offsetHeight;
+                    this.el.style.left = Math.max(8, Math.min(p.x - ox, vw - w - 8)) + 'px';
+                    this.el.style.top = Math.max(8, Math.min(p.y - oy, vh - h - 8)) + 'px';
                 };
 
                 const endDrag = () => {
                     if (!dragging) return;
                     dragging = false;
                     this.el.classList.remove('no-trans');
-                    this.storage.setGlobalNow('position', { left: this.el.style.left, top: this.el.style.top });
-                    this._updateExpandDir();
+                    
+                    // 如果没有实际移动，恢复拖拽开始前的样式
+                    // 这样点击折叠面板时就不会因为 hover 缩放导致位置偏移
+                    if (!moved) {
+                        if (dragStartStyles) {
+                            this.el.style.left = dragStartStyles.left;
+                            this.el.style.right = dragStartStyles.right;
+                            this.el.style.top = dragStartStyles.top;
+                        }
+                        dragStartStyles = null;
+                        return;
+                    }
+                    dragStartStyles = null;
+                    
+                    // 根据最终位置决定定位模式和展开方向
+                    const rect = this.el.getBoundingClientRect();
+                    const { innerWidth: vw } = window;
+                    const centerX = rect.left + rect.width / 2;
+                    const alignRight = centerX > vw / 2;
+                    
+                    if (alignRight) {
+                        // 切换到 right 定位
+                        const rightDist = Math.round(vw - rect.right);
+                        this.el.style.right = rightDist + 'px';
+                        this.el.style.left = 'auto';
+                    }
+                    // 左侧保持 left 定位（在 startDrag 中已设置）
+                    
+                    // 更新展开方向类
+                    this.el.classList.toggle('expand-left', alignRight);
+                    this.el.classList.toggle('expand-right', !alignRight);
+                    
+                    // 更新箭头方向
+                    this._updateArrow();
+                    
+                    this._savePosition();
                 };
 
                 // 鼠标事件
@@ -9402,6 +10588,14 @@
                     }
                 });
 
+                // 导出帖子按钮
+                this.$.exportBtn?.addEventListener('click', e => {
+                    e.stopPropagation();
+                    if (this.topicExporter) {
+                        this.topicExporter.show();
+                    }
+                });
+
                 // LDC 积分按钮（仅 linux.do）
                 this.$.ldcBtn?.addEventListener('click', e => {
                     e.stopPropagation();
@@ -9409,6 +10603,28 @@
                         this.ldcManager.show();
                     }
                 });
+                
+                // 按钮区域展开/收起
+                this.$.actionsToggle?.addEventListener('click', e => {
+                    e.stopPropagation();
+                    const area = this.$.actionsArea;
+                    const toggle = this.$.actionsToggle;
+                    if (!area || !toggle) return;
+                    
+                    const isCollapsed = area.classList.contains('collapsed');
+                    if (isCollapsed) {
+                        area.classList.remove('collapsed');
+                        toggle.classList.add('expanded');
+                        toggle.querySelector('.ldsp-toggle-text').textContent = '收起';
+                    } else {
+                        area.classList.add('collapsed');
+                        toggle.classList.remove('expanded');
+                        toggle.querySelector('.ldsp-toggle-text').textContent = '展开更多';
+                    }
+                });
+                
+                // 检查按钮区域是否需要展开/收起功能（延迟执行以确保DOM已渲染）
+                requestAnimationFrame(() => this._checkActionsOverflow());
                 
                 // 关注/粉丝分别点击
                 this.el.querySelectorAll('.ldsp-follow-part').forEach(part => {
@@ -9524,40 +10740,108 @@
                 el.scrollTop = top;
                 requestAnimationFrame(() => { this._programmaticScroll = false; });
             }
+            
+            // 检查按钮区域是否需要展开/收起功能
+            _checkActionsOverflow() {
+                const area = this.$.actionsArea;
+                const toggle = this.$.actionsToggle;
+                if (!area || !toggle) return;
+                
+                // 获取所有可见的操作按钮（排除登录按钮，因为它和注销按钮互斥显示）
+                const buttons = Array.from(area.querySelectorAll('.ldsp-action-btn')).filter(btn => {
+                    const style = getComputedStyle(btn);
+                    return style.display !== 'none';
+                });
+                
+                if (buttons.length === 0) {
+                    toggle.classList.remove('show');
+                    area.classList.remove('collapsed');
+                    return;
+                }
+                
+                // 临时移除折叠状态来计算实际高度
+                const wasCollapsed = area.classList.contains('collapsed');
+                area.classList.remove('collapsed');
+                
+                // 强制重排以获取正确的布局信息
+                area.offsetHeight;
+                
+                // 通过比较按钮位置来判断行数
+                const firstBtn = buttons[0];
+                const firstTop = firstBtn.getBoundingClientRect().top;
+                let rows = 1;
+                let lastTop = firstTop;
+                
+                for (const btn of buttons) {
+                    const btnTop = btn.getBoundingClientRect().top;
+                    if (btnTop > lastTop + 5) { // 允许5px误差
+                        rows++;
+                        lastTop = btnTop;
+                    }
+                }
+                
+                // 超过2行则显示展开按钮并折叠（折叠后只显示1行）
+                if (rows > 2) {
+                    toggle.classList.add('show');
+                    area.classList.add('collapsed');
+                } else {
+                    toggle.classList.remove('show');
+                    area.classList.remove('collapsed');
+                }
+            }
 
             _restore() {
-                const pos = this.storage.getGlobal('position');
-                if (pos) { 
-                    this.el.style.right = 'auto'; // 拖拽后使用 left
-                    this.el.style.left = pos.left; 
-                    this.el.style.top = pos.top; 
-                }
-
-                if (this.storage.getGlobal('collapsed', false)) {
+                const isCollapsed = this.storage.getGlobal('collapsed', false);
+                if (isCollapsed) {
                     this.el.classList.add('collapsed');
-                    const arrow = this.$.btnToggle.querySelector('.ldsp-toggle-arrow');
-                    if (arrow) arrow.textContent = '▶';
                 }
 
                 const theme = this.storage.getGlobal('theme', 'light');
                 if (theme === 'light') this.el.classList.add('light');
                 this.$.btnTheme.textContent = theme === 'dark' ? '🌓' : '☀️';
 
-                requestAnimationFrame(() => this._updateExpandDir());
+                requestAnimationFrame(() => {
+                    // _restorePosition 会设置位置和 expand-left/expand-right 类
+                    this._restorePosition();
+                    // 更新箭头方向
+                    this._updateArrow();
+                });
             }
 
             _updateExpandDir() {
                 const rect = this.el.getBoundingClientRect();
                 const center = rect.left + rect.width / 2;
-                this.el.classList.toggle('expand-left', center > innerWidth / 2);
-                this.el.classList.toggle('expand-right', center <= innerWidth / 2);
+                const alignRight = center > innerWidth / 2;
+                this.el.classList.toggle('expand-left', alignRight);
+                this.el.classList.toggle('expand-right', !alignRight);
+            }
+            
+            _updateArrow() {
+                const isCollapsed = this.el.classList.contains('collapsed');
+                const alignRight = this.el.classList.contains('expand-left');
+                const arrow = this.$.btnToggle.querySelector('.ldsp-toggle-arrow');
+                if (arrow) {
+                    // 折叠时箭头指向展开方向，展开时箭头指向折叠方向
+                    if (isCollapsed) {
+                        arrow.textContent = alignRight ? '◀' : '▶';
+                    } else {
+                        arrow.textContent = alignRight ? '▶' : '◀';
+                    }
+                }
             }
 
             _onResize() {
-                if (this.el.classList.contains('collapsed')) return; // 折叠状态不处理
-                
                 const cfg = Screen.getConfig();
                 const el = this.el;
+                const isCollapsed = el.classList.contains('collapsed');
+                
+                // 窗口变化时恢复位置（会同时更新 expand-left/expand-right 类）
+                this._restorePosition();
+                
+                // 重新检测按钮区域溢出（延迟执行以确保布局已更新）
+                requestAnimationFrame(() => this._checkActionsOverflow());
+                
+                if (isCollapsed) return;
                 
                 // 更新CSS变量
                 el.style.setProperty('--w', `${cfg.width}px`);
@@ -9567,57 +10851,104 @@
                 el.style.setProperty('--av', `${cfg.avatarSize}px`);
                 el.style.setProperty('--ring', `${cfg.ringSize}px`);
                 
-                // 确保面板宽度和最大高度不超出视口
                 el.style.width = `${cfg.width}px`;
                 el.style.maxHeight = `${cfg.maxHeight}px`;
-                
-                // 检查并修正面板位置，确保完全在视口内
-                this._clampPosition();
-                this._updateExpandDir();
             }
             
-            // 确保面板位置在视口内
-            _clampPosition() {
+            /**
+             * 保存位置（拖拽后调用）
+             * 
+             * 存储格式：{ topRatio, anchorX, alignRight }
+             * 直接从 inline style 读取位置，避免精度累积误差
+             */
+            _savePosition() {
                 const el = this.el;
                 const rect = el.getBoundingClientRect();
                 const { innerWidth: vw, innerHeight: vh } = window;
-                const margin = 8; // 最小边距
-                let needUpdate = false;
-                let newLeft = parseFloat(el.style.left) || rect.left;
-                let newTop = parseFloat(el.style.top) || rect.top;
                 
-                // 面板实际尺寸（考虑折叠状态）
+                const centerX = rect.left + rect.width / 2;
+                const alignRight = centerX > vw / 2;
+                
+                // 直接从 inline style 读取锚点位置，取整避免精度问题
+                let anchorX;
+                if (alignRight) {
+                    const styleRight = parseFloat(el.style.right);
+                    anchorX = !isNaN(styleRight) ? Math.round(styleRight) : Math.round(vw - rect.right);
+                } else {
+                    const styleLeft = parseFloat(el.style.left);
+                    anchorX = !isNaN(styleLeft) ? Math.round(styleLeft) : Math.round(rect.left);
+                }
+                
+                this.storage.setGlobalNow('position', { 
+                    topRatio: rect.top / vh,
+                    anchorX,
+                    alignRight 
+                });
+            }
+            
+            /**
+             * 恢复位置
+             * 根据 alignRight 使用不同的定位模式，锚定边缘位置不变
+             */
+            _restorePosition() {
+                const el = this.el;
+                const pos = this.storage.getGlobal('position');
+                const { innerWidth: vw, innerHeight: vh } = window;
+                const margin = 8;
                 const isCollapsed = el.classList.contains('collapsed');
-                const panelWidth = isCollapsed ? 48 : rect.width;
-                const panelHeight = isCollapsed ? 48 : rect.height;
+                const cfg = Screen.getConfig();
                 
-                // 检查并修正水平位置
-                if (newLeft + panelWidth > vw - margin) {
-                    newLeft = Math.max(margin, vw - panelWidth - margin);
-                    needUpdate = true;
-                }
-                if (newLeft < margin) {
-                    newLeft = margin;
-                    needUpdate = true;
+                // 折叠状态尺寸常量
+                const COLLAPSED_SIZE = 48;
+                const panelWidth = isCollapsed ? COLLAPSED_SIZE : (parseInt(el.style.width) || cfg.width);
+                const panelHeight = isCollapsed ? COLLAPSED_SIZE : (parseInt(el.style.maxHeight) || cfg.maxHeight);
+                
+                let alignRight = true;
+                let anchorX = 20;
+                let top;
+                
+                if (pos && typeof pos.alignRight === 'boolean') {
+                    alignRight = pos.alignRight;
+                    anchorX = pos.anchorX ?? 20;
+                    top = pos.topRatio !== undefined ? pos.topRatio * vh : pos.top;
+                } else if (pos && (pos.left !== undefined || pos.leftDist !== undefined)) {
+                    // 兼容旧格式
+                    const leftDist = parseFloat(pos.left || pos.leftDist);
+                    top = parseFloat(pos.top || 0);
+                    alignRight = leftDist + panelWidth / 2 > vw / 2;
+                    anchorX = alignRight ? (vw - leftDist - panelWidth) : leftDist;
+                } else if (pos && pos.rightDist !== undefined) {
+                    // 兼容上一版本格式
+                    alignRight = pos.alignRight;
+                    anchorX = alignRight ? pos.rightDist : pos.leftDist;
+                    top = pos.topRatio !== undefined ? pos.topRatio * vh : 0;
+                } else {
+                    // 默认位置（右下角）
+                    top = vh - panelHeight - 20;
                 }
                 
-                // 检查并修正垂直位置
-                if (newTop + panelHeight > vh - margin) {
-                    newTop = Math.max(margin, vh - panelHeight - margin);
-                    needUpdate = true;
-                }
-                if (newTop < margin) {
-                    newTop = margin;
-                    needUpdate = true;
-                }
+                // 确保在视口内
+                top = Math.max(margin, Math.min(top, vh - panelHeight - margin));
+                anchorX = Math.max(margin, Math.min(anchorX, vw - panelWidth - margin));
                 
-                // 应用修正后的位置
-                if (needUpdate) {
-                    el.style.left = `${newLeft}px`;
-                    el.style.top = `${newTop}px`;
+                // 取整避免精度问题
+                anchorX = Math.round(anchorX);
+                top = Math.round(top);
+                
+                if (alignRight) {
+                    // 靠右：使用 right 定位
+                    el.style.right = `${anchorX}px`;
+                    el.style.left = 'auto';
+                } else {
+                    // 靠左：使用 left 定位
+                    el.style.left = `${anchorX}px`;
                     el.style.right = 'auto';
-                    this.storage.setGlobalNow('position', { left: el.style.left, top: el.style.top });
                 }
+                el.style.top = `${top}px`;
+                
+                // 更新展开方向类
+                el.classList.toggle('expand-left', alignRight);
+                el.classList.toggle('expand-right', !alignRight);
             }
 
             // 初始化面板手动调整大小功能（仅桌面端）
@@ -9711,33 +11042,162 @@
                 }
             }
 
+            /**
+             * 面板展开/折叠切换
+             * 
+             * 设计原则：
+             * - 左侧面板（靠左对齐）：折叠/展开时保持左边缘位置不变
+             * - 右侧面板（靠右对齐）：折叠/展开时保持右边缘位置不变
+             * 
+             * 实现方式：
+             * - 读取已保存的 alignRight 来确定对齐方向（避免因尺寸变化导致判断不一致）
+             * - 根据当前定位模式读取正确的锚点位置
+             * - left 定位的面板取 left 值，right 定位的面板取 right 值
+             */
             _toggle() {
-                const collapsing = !this.el.classList.contains('collapsed');
-                const rect = this.el.getBoundingClientRect();
-                const cfg = Screen.getConfig();
-
-                this.el.classList.add('anim');
-
-                if (collapsing) {
-                    if (this.el.classList.contains('expand-left')) this.el.style.left = (rect.right - 44) + 'px';
-                    const arrow = this.$.btnToggle.querySelector('.ldsp-toggle-arrow');
-                    if (arrow) arrow.textContent = '▶';
-                } else {
-                    this._updateExpandDir();
-                    if (this.el.classList.contains('expand-left')) this.el.style.left = Math.max(0, rect.left - (cfg.width - 44)) + 'px';
-                    const arrow = this.$.btnToggle.querySelector('.ldsp-toggle-arrow');
-                    if (arrow) arrow.textContent = '◀';
-                    this.animRing = true;
-                    this.cachedReqs.length && setTimeout(() => this.renderer.renderReqs(this.cachedReqs), 100);
+                const el = this.el;
+                const isCurrentlyCollapsed = el.classList.contains('collapsed');
+                const willCollapse = !isCurrentlyCollapsed;
+                const { innerWidth: vw } = window;
+                
+                // 从已保存的位置获取对齐方向，避免因面板尺寸变化导致判断不一致
+                const savedPos = this.storage.getGlobal('position');
+                const alignRight = savedPos?.alignRight ?? el.classList.contains('expand-left');
+                
+                // 1. 立即禁用过渡和清除 transform（避免 hover 缩放效果影响位置计算）
+                el.classList.add('no-trans');
+                el.classList.remove('anim');
+                el.style.transform = 'none';
+                
+                // 强制应用样式
+                void el.offsetWidth;
+                
+                // 2. 获取当前锚点位置（直接使用保存的值最可靠）
+                let anchorX = savedPos?.anchorX;
+                
+                // 如果没有保存的值，从 style 或 rect 计算
+                if (anchorX === undefined || anchorX === null) {
+                    if (alignRight) {
+                        const styleRight = parseFloat(el.style.right);
+                        if (!isNaN(styleRight)) {
+                            anchorX = styleRight;
+                        } else {
+                            const rect = el.getBoundingClientRect();
+                            anchorX = vw - rect.right;
+                        }
+                    } else {
+                        const styleLeft = parseFloat(el.style.left);
+                        if (!isNaN(styleLeft)) {
+                            anchorX = styleLeft;
+                        } else {
+                            const rect = el.getBoundingClientRect();
+                            anchorX = rect.left;
+                        }
+                    }
                 }
+                
+                // 3. 设置定位模式（取整避免精度问题）
+                anchorX = Math.round(anchorX);
+                if (alignRight) {
+                    el.style.right = anchorX + 'px';
+                    el.style.left = 'auto';
+                } else {
+                    el.style.left = anchorX + 'px';
+                    el.style.right = 'auto';
+                }
+                
+                // 清除内联 transform（让 CSS 类控制）
+                el.style.transform = '';
+                
+                // 更新展开方向类
+                el.classList.toggle('expand-left', alignRight);
+                el.classList.toggle('expand-right', !alignRight);
+                
+                // 4. 强制浏览器应用定位模式
+                void el.offsetWidth;
+                
+                // 5. 启用过渡动画
+                el.classList.remove('no-trans');
+                el.classList.add('anim');
+                
+                // 6. 切换折叠状态（使用 rAF 确保过渡生效）
+                requestAnimationFrame(() => {
+                    el.classList.toggle('collapsed');
+                    
+                    // 更新箭头方向
+                    this._updateArrow();
+                    
+                    // 保存折叠状态
+                    this.storage.setGlobalNow('collapsed', willCollapse);
+                    
+                    // 展开时的额外处理
+                    if (!willCollapse) {
+                        this.animRing = true;
+                        this.cachedReqs.length && setTimeout(() => this.renderer.renderReqs(this.cachedReqs), 100);
+                    }
 
-                this.el.classList.toggle('collapsed');
-                this.storage.setGlobalNow('collapsed', collapsing);
-
-                setTimeout(() => {
-                    this.el.classList.remove('anim');
-                    this.storage.setGlobalNow('position', { left: this.el.style.left, top: this.el.style.top });
-                }, 400);
+                    // 7. 动画结束后清理状态
+                    setTimeout(() => {
+                        el.classList.remove('anim');
+                        // 保存位置（保持当前的 alignRight，只更新 anchorX 和 top）
+                        this._savePositionKeepAlign(alignRight);
+                    }, 400);
+                });
+            }
+            
+            /**
+             * 保存位置，但保持指定的对齐方向
+             * 完全从 inline style 读取位置值，避免 getBoundingClientRect 在动画期间的不稳定值
+             */
+            _savePositionKeepAlign(alignRight) {
+                const el = this.el;
+                const { innerWidth: vw, innerHeight: vh } = window;
+                
+                // 直接从 inline style 读取锚点位置
+                let anchorX;
+                if (alignRight) {
+                    const styleRight = parseFloat(el.style.right);
+                    // 如果 style.right 是 'auto' 或无效值，从 rect 计算
+                    if (!isNaN(styleRight)) {
+                        anchorX = Math.round(styleRight);
+                    } else {
+                        const rect = el.getBoundingClientRect();
+                        anchorX = Math.round(vw - rect.right);
+                    }
+                } else {
+                    const styleLeft = parseFloat(el.style.left);
+                    // 如果 style.left 是 'auto' 或无效值，从 rect 计算
+                    if (!isNaN(styleLeft)) {
+                        anchorX = Math.round(styleLeft);
+                    } else {
+                        const rect = el.getBoundingClientRect();
+                        anchorX = Math.round(rect.left);
+                    }
+                }
+                
+                // 确保 anchorX 在合理范围内（防止保存无效值）
+                anchorX = Math.max(8, anchorX);
+                
+                // top 也从 style 读取，避免动画期间 getBoundingClientRect 的不稳定
+                const styleTop = parseFloat(el.style.top);
+                const topRatio = !isNaN(styleTop) ? styleTop / vh : undefined;
+                
+                // 如果有有效的 topRatio，则保存；否则保留之前的值
+                if (topRatio !== undefined) {
+                    this.storage.setGlobalNow('position', { 
+                        topRatio,
+                        anchorX,
+                        alignRight 
+                    });
+                } else {
+                    // 只更新 anchorX，保留之前的 topRatio
+                    const oldPos = this.storage.getGlobal('position') || {};
+                    this.storage.setGlobalNow('position', { 
+                        ...oldPos,
+                        anchorX,
+                        alignRight 
+                    });
+                }
             }
 
             _switchTheme() {
@@ -11140,6 +12600,13 @@
             }
 
             async _loadReadTopics(container) {
+                // 检查登录状态
+                const username = this.storage.getUser();
+                if (!username) {
+                    container.innerHTML = this.renderer.renderActivityEmpty('🔒', '请先登录论坛');
+                    return;
+                }
+                
                 // 获取当前分页状态
                 let state = this.activityMgr.getPageState('read');
                 
