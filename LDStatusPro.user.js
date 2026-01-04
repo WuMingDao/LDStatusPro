@@ -1,7 +1,7 @@
     // ==UserScript==
     // @name         LDStatus Pro
     // @namespace    http://tampermonkey.net/
-    // @version      3.5.2.9
+    // @version      3.5.3.0
     // @description  在 Linux.do 和 IDCFlare 页面显示信任级别进度，支持历史趋势、里程碑通知、阅读时间统计、排行榜系统、我的活动查看。两站点均支持排行榜和云同步功能
     // @author       JackLiii
     // @license      MIT
@@ -4304,6 +4304,115 @@
     .ldsp-ldc-detail-row .value.status-success{color:var(--ok);font-weight:600}
     .ldsp-ldc-detail-row .value.link{color:var(--accent);text-decoration:none;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block}
     .ldsp-ldc-detail-row .value.link:hover{text-decoration:underline}
+    /* 小卖部样式 */
+    .ldsp-shop{display:flex;flex-direction:column;gap:10px;flex:1;min-height:0}
+    .ldsp-shop-header{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-shrink:0}
+    .ldsp-shop-tabs{display:flex;gap:6px}
+    .ldsp-shop-tab{padding:6px 12px;background:var(--bg-el);border:1px solid var(--border);border-radius:var(--r-sm);font-size:10px;font-weight:600;color:var(--txt-sec);cursor:pointer;transition:all .15s}
+    .ldsp-shop-tab:hover{border-color:var(--txt-mut);color:var(--txt)}
+    .ldsp-shop-tab.active{background:rgba(107,140,239,.12);border-color:var(--accent);color:var(--accent)}
+    .ldsp-shop-add-btn{padding:6px 12px;background:var(--grad);border:none;border-radius:var(--r-sm);font-size:10px;font-weight:600;color:#fff;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:4px}
+    .ldsp-shop-add-btn:hover{opacity:.9;transform:translateY(-1px)}
+    .ldsp-shop-filter{display:flex;gap:6px;flex-wrap:wrap;padding:8px 0;flex-shrink:0;border-bottom:1px solid var(--border);margin-bottom:4px}
+    .ldsp-shop-filter-chip{padding:5px 10px;background:var(--bg-el);border:1px solid var(--border);border-radius:999px;font-size:10px;color:var(--txt-sec);cursor:pointer;transition:all .15s;white-space:nowrap}
+    .ldsp-shop-filter-chip:hover{border-color:var(--txt-mut);color:var(--txt);background:var(--bg-hover)}
+    .ldsp-shop-filter-chip.active{background:rgba(107,140,239,.15);border-color:var(--accent);color:var(--accent);font-weight:600}
+    .ldsp-shop-grid{display:flex;flex-wrap:wrap;gap:8px;overflow-y:auto;flex:1;min-height:0;padding-bottom:4px;align-content:flex-start}
+    .ldsp-shop-card{width:calc(50% - 4px);background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;cursor:pointer;transition:all .2s;position:relative;box-sizing:border-box}
+    .ldsp-shop-card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,.1)}
+    .ldsp-shop-card-cover{width:100%;height:70px;display:flex;align-items:center;justify-content:center;font-size:28px;overflow:hidden}
+    .ldsp-shop-card-cover img{width:100%;height:100%;object-fit:cover}
+    .ldsp-shop-card-body{padding:8px;display:flex;flex-direction:column;gap:4px}
+    .ldsp-shop-card-name{font-size:11px;font-weight:600;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .ldsp-shop-card-meta{display:flex;align-items:center;gap:6px}
+    .ldsp-shop-card-category{font-size:8px;color:#fff;padding:2px 5px;background:linear-gradient(135deg,var(--accent),#8b5cf6);border-radius:3px;font-weight:500}
+    .ldsp-shop-card-time{font-size:8px;color:var(--txt-mut);margin-left:auto}
+    .ldsp-shop-card-seller{font-size:9px;color:var(--txt-sec);display:flex;align-items:center;gap:3px;overflow:hidden}
+    .ldsp-shop-card-seller-avatar{width:14px;height:14px;border-radius:50%;background:var(--bg-el);flex-shrink:0;object-fit:cover}
+    .ldsp-shop-card-footer{display:flex;justify-content:space-between;align-items:center;padding-top:6px;border-top:1px solid var(--border)}
+    .ldsp-shop-card-price{font-size:13px;font-weight:700;color:var(--accent);display:flex;align-items:baseline;gap:1px}
+    .ldsp-shop-card-price span{font-size:8px;font-weight:500;color:var(--txt-mut)}
+    .ldsp-shop-card-price.discounted{color:var(--ok)}
+    .ldsp-shop-card-original{font-size:8px;color:var(--txt-mut);text-decoration:line-through;margin-left:3px}
+    .ldsp-shop-card-views{font-size:8px;color:var(--txt-mut)}
+    .ldsp-shop-card-discount{position:absolute;top:6px;right:6px;padding:2px 5px;background:linear-gradient(135deg,var(--err),#f43f5e);color:#fff;font-size:8px;font-weight:600;border-radius:3px;z-index:1}
+    .ldsp-shop-card-status{position:absolute;top:6px;left:6px;padding:2px 6px;font-size:9px;font-weight:600;border-radius:4px}
+    .ldsp-shop-card-status.active{background:rgba(34,197,94,.15);color:#22c55e}
+    .ldsp-shop-card-status.inactive{background:rgba(239,68,68,.15);color:#ef4444}
+    .ldsp-shop-load-more{width:100%;padding:12px;text-align:center;font-size:11px;color:var(--txt-mut);cursor:pointer;transition:color .15s}
+    .ldsp-shop-load-more:hover{color:var(--accent)}
+    .ldsp-shop-load-more.loading{pointer-events:none;opacity:.6}
+    .ldsp-shop-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;flex:1;text-align:center}
+    .ldsp-shop-empty-icon{font-size:40px;margin-bottom:10px;opacity:.7}
+    .ldsp-shop-empty-text{font-size:12px;color:var(--txt-mut);margin-bottom:6px}
+    .ldsp-shop-empty-hint{font-size:10px;color:var(--txt-mut);opacity:.7}
+    /* 小卖部详情页 */
+    .ldsp-shop-detail{display:flex;flex-direction:column;gap:10px;flex:1;min-height:0;overflow-y:auto;padding-bottom:4px}
+    .ldsp-shop-detail-header{display:flex;align-items:center;gap:8px;flex-shrink:0}
+    .ldsp-shop-back-btn{padding:5px 10px;background:var(--bg-el);border:1px solid var(--border);border-radius:var(--r-sm);font-size:11px;color:var(--txt-sec);cursor:pointer;transition:all .15s;flex-shrink:0}
+    .ldsp-shop-back-btn:hover{background:var(--bg-hover);border-color:var(--accent);color:var(--accent)}
+    .ldsp-shop-detail-category{font-size:9px;color:#fff;padding:2px 8px;background:linear-gradient(135deg,var(--accent),#8b5cf6);border-radius:4px;font-weight:500}
+    .ldsp-shop-detail-img{width:100%;height:130px;object-fit:cover;border-radius:var(--r-md);background:var(--bg-el);flex-shrink:0}
+    .ldsp-shop-detail-placeholder{width:100%;height:130px;border-radius:var(--r-md);display:flex;align-items:center;justify-content:center;font-size:42px;flex-shrink:0}
+    .ldsp-shop-detail-content{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-md);padding:10px 12px}
+    .ldsp-shop-detail-name{font-size:14px;font-weight:700;color:var(--txt);margin-bottom:6px;line-height:1.4}
+    .ldsp-shop-detail-desc{font-size:11px;color:var(--txt-sec);line-height:1.5;white-space:pre-wrap;word-break:break-word;max-height:60px;overflow-y:auto}
+    .ldsp-shop-detail-price-row{display:flex;align-items:center;gap:6px;padding:10px 12px;background:linear-gradient(135deg,rgba(107,140,239,.1),rgba(139,92,246,.08));border:1px solid rgba(107,140,239,.2);border-radius:var(--r-md)}
+    .ldsp-shop-detail-price{font-size:20px;font-weight:700;color:var(--accent)}
+    .ldsp-shop-detail-price span{font-size:10px;font-weight:500;color:var(--txt-mut);margin-left:2px}
+    .ldsp-shop-detail-price.discounted{color:#22c55e}
+    .ldsp-shop-detail-original{font-size:11px;color:var(--txt-mut);text-decoration:line-through}
+    .ldsp-shop-detail-discount-badge{padding:2px 6px;background:linear-gradient(135deg,var(--err),#f43f5e);color:#fff;font-size:9px;font-weight:600;border-radius:3px;margin-left:auto}
+    .ldsp-shop-detail-info{display:flex;flex-wrap:wrap;gap:6px;font-size:9px;color:var(--txt-mut)}
+    .ldsp-shop-detail-info-item{display:flex;align-items:center;gap:3px;padding:3px 6px;background:var(--bg-el);border-radius:var(--r-sm)}
+    .ldsp-shop-seller{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-md);cursor:pointer;transition:all .15s}
+    .ldsp-shop-seller:hover{border-color:var(--accent);background:var(--bg-hover)}
+    .ldsp-shop-seller-avatar{width:28px;height:28px;border-radius:50%;border:1px solid var(--border);background:var(--bg-el);object-fit:cover}
+    .ldsp-shop-seller-info{flex:1;min-width:0}
+    .ldsp-shop-seller-name{font-size:11px;font-weight:600;color:var(--txt)}
+    .ldsp-shop-seller-label{font-size:8px;color:var(--txt-mut)}
+    .ldsp-shop-seller-arrow{font-size:12px;color:var(--txt-mut);transition:transform .15s}
+    .ldsp-shop-seller:hover .ldsp-shop-seller-arrow{transform:translateX(3px);color:var(--accent)}
+    .ldsp-shop-purchase-action{padding:10px;background:#4f7cef !important;border:none !important;border-radius:var(--r-md);font-size:13px !important;font-weight:600 !important;color:#fff !important;cursor:pointer;transition:all .2s;display:block;text-align:center;flex-shrink:0;text-decoration:none !important;box-sizing:border-box}
+    .ldsp-shop-purchase-action:hover{background:#3d6be0 !important;box-shadow:0 4px 12px rgba(79,124,239,.35);color:#fff !important}
+    /* 小卖部表单 */
+    .ldsp-shop-form{display:flex;flex-direction:column;gap:12px;flex:1;min-height:0;overflow-y:auto}
+    .ldsp-shop-form-header{display:flex;align-items:center;gap:10px;flex-shrink:0}
+    .ldsp-shop-form-title{font-size:14px;font-weight:700;color:var(--txt)}
+    .ldsp-shop-form-group{display:flex;flex-direction:column;gap:4px}
+    .ldsp-shop-form-label{font-size:10px;font-weight:600;color:var(--txt-sec);display:flex;align-items:center;gap:4px}
+    .ldsp-shop-form-label .required{color:var(--err)}
+    .ldsp-shop-form-input{padding:10px 12px;background:var(--bg-el);border:1px solid var(--border);border-radius:var(--r-sm);font-size:12px;color:var(--txt);transition:border-color .15s;width:100%;box-sizing:border-box}
+    .ldsp-shop-form-input:focus{border-color:var(--accent);outline:none}
+    .ldsp-shop-form-input::placeholder{color:var(--txt-mut)}
+    .ldsp-shop-form-textarea{min-height:80px;resize:vertical;font-family:inherit;line-height:1.5}
+    .ldsp-shop-form-select{padding:10px 12px;background:var(--bg-el);border:1px solid var(--border);border-radius:var(--r-sm);font-size:12px;color:var(--txt);cursor:pointer;width:100%;box-sizing:border-box}
+    .ldsp-shop-form-select:focus{border-color:var(--accent);outline:none}
+    .ldsp-shop-form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .ldsp-shop-form-hint{font-size:9px;color:var(--txt-mut);margin-top:2px}
+    .ldsp-shop-form-actions{display:flex;gap:8px;margin-top:auto;padding-top:10px;flex-shrink:0}
+    .ldsp-shop-form-btn{flex:1;padding:10px;border:none;border-radius:var(--r-sm);font-size:12px;font-weight:600;cursor:pointer;transition:all .15s}
+    .ldsp-shop-form-btn.primary{background:var(--grad);color:#fff}
+    .ldsp-shop-form-btn.primary:hover{opacity:.9}
+    .ldsp-shop-form-btn.secondary{background:var(--bg-el);color:var(--txt-sec);border:1px solid var(--border)}
+    .ldsp-shop-form-btn.secondary:hover{border-color:var(--txt-mut);color:var(--txt)}
+    .ldsp-shop-form-btn:disabled{opacity:.5;cursor:not-allowed}
+    /* 我的商品卡片 */
+    .ldsp-shop-my-card{display:flex;gap:10px;padding:10px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-md);position:relative}
+    .ldsp-shop-my-card-img{width:60px;height:60px;object-fit:cover;border-radius:var(--r-sm);background:var(--bg-el);flex-shrink:0}
+    .ldsp-shop-my-card-img-placeholder{width:60px;height:60px;background:var(--bg-el);border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;font-size:20px;color:var(--txt-mut);flex-shrink:0}
+    .ldsp-shop-my-card-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+    .ldsp-shop-my-card-name{font-size:12px;font-weight:600;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .ldsp-shop-my-card-meta{font-size:10px;color:var(--txt-mut);display:flex;align-items:center;gap:8px}
+    .ldsp-shop-my-card-price{font-size:13px;font-weight:700;color:var(--accent)}
+    .ldsp-shop-my-card-actions{display:flex;gap:6px;margin-top:auto}
+    .ldsp-shop-my-card-btn{padding:4px 10px;border:1px solid var(--border);border-radius:var(--r-sm);font-size:10px;color:var(--txt-sec);background:var(--bg-el);cursor:pointer;transition:all .15s}
+    .ldsp-shop-my-card-btn:hover{border-color:var(--accent);color:var(--accent)}
+    .ldsp-shop-my-card-btn.danger:hover{border-color:var(--err);color:var(--err)}
+    .ldsp-shop-my-card-status{position:absolute;top:8px;right:8px;padding:2px 6px;font-size:9px;font-weight:600;border-radius:4px}
+    .ldsp-shop-my-card-status.active{background:rgba(34,197,94,.15);color:#22c55e}
+    .ldsp-shop-my-card-status.inactive{background:rgba(239,68,68,.15);color:#ef4444}
+    .ldsp-shop-my-list{display:flex;flex-direction:column;gap:8px;overflow-y:auto;flex:1;min-height:0}
     /* LDC/工单/吃瓜/CDK 响应式适配 */
     @media (max-width:380px){.ldsp-ldc-header,.ldsp-ticket-header,.ldsp-melon-header,.ldsp-cdk-header{padding:8px 10px}.ldsp-ldc-title,.ldsp-ticket-title,.ldsp-melon-title,.ldsp-cdk-title{font-size:12px}.ldsp-ldc-tabs{}.ldsp-ldc-tab,.ldsp-cdk-tab{padding:8px 6px;font-size:10px}.ldsp-ldc-body,.ldsp-ticket-body,.ldsp-melon-body,.ldsp-cdk-body{padding:10px;gap:8px}.ldsp-ldc-balance-card{padding:12px}.ldsp-ldc-balance-main{gap:8px}.ldsp-ldc-balance-value{font-size:24px}.ldsp-ldc-balance-right{gap:3px}.ldsp-ldc-balance-sub,.ldsp-ldc-balance-estimate{font-size:9px}.ldsp-ldc-stats-grid{grid-template-columns:1fr}.ldsp-ldc-stat-card{padding:10px;gap:8px}.ldsp-ldc-stat-icon{font-size:16px}.ldsp-ldc-stat-num{font-size:13px}.ldsp-ldc-chart-bars{height:60px}.ldsp-ldc-filter-section{gap:6px;padding-bottom:8px}.ldsp-ldc-filter-label{font-size:9px;min-width:24px}.ldsp-ldc-filter-chip{padding:4px 8px;font-size:9px}.ldsp-ldc-trans-item{padding:8px}.ldsp-ldc-trans-icon{font-size:14px;width:22px;height:22px}.ldsp-ldc-trans-name{font-size:11px}.ldsp-ldc-trans-amount{font-size:13px}.ldsp-ticket-tabs{padding:0 8px}.ldsp-ticket-tab,.ldsp-melon-tab{padding:6px 10px;font-size:9px}.ldsp-ldc-support{gap:12px}.ldsp-ldc-support-header{padding:10px 8px}.ldsp-ldc-support-title{font-size:13px}.ldsp-ldc-support-grid{gap:8px}.ldsp-ldc-support-card{padding:14px 10px}.ldsp-ldc-support-icon{font-size:28px;margin-bottom:8px}.ldsp-ldc-support-amount{font-size:16px}.ldsp-github-star-card{gap:10px;padding:10px 12px}.ldsp-github-icon-wrap{width:30px;height:30px}.ldsp-github-icon{width:26px;height:26px}.ldsp-github-title{font-size:11px;gap:4px}.ldsp-github-star-icon{font-size:14px}.ldsp-github-desc{font-size:9px}.ldsp-github-arrow{font-size:14px}.ldsp-cdk-user-card{flex-wrap:wrap;gap:10px;padding:12px}.ldsp-cdk-user-card::before{display:none}.ldsp-cdk-user-avatar{width:40px;height:40px}.ldsp-cdk-user-info{flex:1;min-width:80px;display:flex;flex-direction:column;align-items:flex-start}.ldsp-cdk-user-name{font-size:13px}.ldsp-cdk-user-username{font-size:9px}.ldsp-cdk-user-level{font-size:9px;padding:2px 8px;margin-top:4px}.ldsp-cdk-score-card{min-width:70px;padding:10px}.ldsp-cdk-score-label{font-size:8px}.ldsp-cdk-score-value{font-size:20px}.ldsp-cdk-qty-card{flex-direction:column;padding:10px;gap:8px}.ldsp-cdk-qty-item{padding:8px}.ldsp-cdk-qty-item.remain{border-right:none;border-bottom:1px solid var(--border)}.ldsp-cdk-qty-item .num{font-size:20px}.ldsp-cdk-qty-divider{display:none}.ldsp-cdk-item{padding:10px}.ldsp-cdk-item-name{font-size:12px}.ldsp-cdk-item-content{padding:6px 8px;font-size:10px}}
     @media (max-width:320px){.ldsp-ldc-header,.ldsp-ticket-header,.ldsp-melon-header,.ldsp-cdk-header{padding:6px 8px}.ldsp-ldc-title,.ldsp-ticket-title,.ldsp-melon-title,.ldsp-cdk-title{font-size:11px;gap:4px}.ldsp-ldc-header-actions,.ldsp-cdk-header-actions{gap:5px}.ldsp-ldc-link,.ldsp-cdk-link{font-size:9px!important}.ldsp-ldc-refresh,.ldsp-ldc-close,.ldsp-ticket-close,.ldsp-melon-close,.ldsp-cdk-refresh,.ldsp-cdk-close{width:22px;height:22px;font-size:10px}.ldsp-ldc-refresh svg,.ldsp-cdk-refresh svg{width:10px;height:10px}.ldsp-ldc-tab,.ldsp-cdk-tab{padding:6px 4px;font-size:9px}.ldsp-ldc-body,.ldsp-ticket-body,.ldsp-melon-body,.ldsp-cdk-body{padding:8px;gap:6px}.ldsp-ldc-balance-card{padding:10px}.ldsp-ldc-balance-main{flex-direction:column;align-items:stretch;gap:10px}.ldsp-ldc-balance-left{text-align:center}.ldsp-ldc-balance-value{font-size:26px}.ldsp-ldc-balance-right{text-align:center;flex-direction:row;justify-content:center;gap:12px;flex-wrap:wrap;padding-top:8px;border-top:1px dashed rgba(139,92,246,.1)}.ldsp-ldc-balance-sub,.ldsp-ldc-balance-estimate{justify-content:center;font-size:9px}.ldsp-ldc-balance-footer{justify-content:center}.ldsp-ldc-stats-grid{grid-template-columns:1fr;gap:6px}.ldsp-ldc-stat-card{padding:8px;gap:6px;flex-direction:row}.ldsp-ldc-stat-icon{font-size:14px}.ldsp-ldc-stat-label{font-size:9px}.ldsp-ldc-stat-num{font-size:12px}.ldsp-ldc-section-title{font-size:10px}.ldsp-ldc-chart{padding:8px}.ldsp-ldc-chart-bars{height:50px}.ldsp-ldc-chart-label{font-size:8px}.ldsp-ldc-filter-section{gap:5px;padding-bottom:6px}.ldsp-ldc-filter-row{gap:6px}.ldsp-ldc-filter-label{font-size:8px;min-width:20px;padding-top:4px}.ldsp-ldc-filter-chip{padding:3px 6px;font-size:8px}.ldsp-ldc-trans-content{gap:6px}.ldsp-ldc-trans-summary{font-size:9px}.ldsp-ldc-trans-list{gap:4px}.ldsp-ldc-trans-item{padding:6px 8px;gap:6px}.ldsp-ldc-trans-icon{font-size:12px;width:20px;height:20px;border-radius:4px}.ldsp-ldc-trans-name{font-size:10px}.ldsp-ldc-trans-meta{font-size:8px;gap:4px}.ldsp-ldc-trans-type{font-size:8px;padding:1px 4px}.ldsp-ldc-trans-amount{font-size:11px}.ldsp-ldc-detail-amount-value{font-size:22px}.ldsp-ldc-detail-row{padding:8px 10px}.ldsp-ldc-detail-row .label,.ldsp-ldc-detail-row .value{font-size:10px}.ldsp-ticket-tabs{padding:0 6px}.ldsp-ticket-tab,.ldsp-melon-tab{padding:5px 8px;font-size:8px}.ldsp-ticket-item{padding:8px}.ldsp-ticket-item-title{font-size:10px}.ldsp-ticket-item-type,.ldsp-ticket-item-meta{font-size:8px}.ldsp-ldc-support{gap:8px}.ldsp-ldc-support-header{padding:8px 6px}.ldsp-ldc-support-title{font-size:12px;gap:5px}.ldsp-ldc-support-desc{font-size:9px}.ldsp-ldc-support-grid{gap:6px}.ldsp-ldc-support-card{padding:12px 8px}.ldsp-ldc-support-icon{font-size:24px;margin-bottom:6px}.ldsp-ldc-support-name{font-size:10px;margin-bottom:4px}.ldsp-ldc-support-amount{font-size:14px}.ldsp-ldc-support-badge{font-size:8px;padding:2px 5px;top:6px;right:6px}.ldsp-ldc-support-footer{padding:8px}.ldsp-ldc-support-footer-text{font-size:9px}.ldsp-github-star-card{gap:8px;padding:8px 10px}.ldsp-github-icon-wrap{width:26px;height:26px}.ldsp-github-icon{width:22px;height:22px}.ldsp-github-title{font-size:10px;gap:4px;flex-wrap:wrap}.ldsp-github-star-icon{font-size:12px}.ldsp-github-desc{font-size:8px;line-height:1.4}.ldsp-github-arrow{font-size:12px}.ldsp-cdk-user-card{padding:10px;gap:8px}.ldsp-cdk-user-avatar{width:36px;height:36px}.ldsp-cdk-user-name{font-size:12px}.ldsp-cdk-user-username{font-size:8px}.ldsp-cdk-user-level{font-size:8px;padding:2px 6px;margin-top:3px}.ldsp-cdk-score-card{min-width:60px;padding:8px}.ldsp-cdk-score-label{font-size:7px}.ldsp-cdk-score-value{font-size:16px}.ldsp-cdk-search{padding:6px 10px}.ldsp-cdk-search input{font-size:11px}.ldsp-cdk-qty-card{padding:8px;gap:6px}.ldsp-cdk-qty-item{padding:6px}.ldsp-cdk-qty-item .num{font-size:18px}.ldsp-cdk-qty-item .lbl{font-size:8px}.ldsp-cdk-item{padding:8px;gap:6px}.ldsp-cdk-item-name{font-size:11px}.ldsp-cdk-item-time{font-size:8px;padding:1px 4px}.ldsp-cdk-item-creator{font-size:9px}.ldsp-cdk-item-content{padding:5px 7px;font-size:9px;gap:6px}.ldsp-cdk-item-copy{width:24px;height:24px;font-size:10px}.ldsp-cdk-detail-title{font-size:12px}.ldsp-cdk-detail-meta{font-size:9px}.ldsp-cdk-detail-desc{font-size:10px;padding:8px}.ldsp-cdk-detail-content{padding:10px}.ldsp-cdk-detail-content-label{font-size:9px}.ldsp-cdk-detail-content-value{font-size:12px}.ldsp-cdk-detail-copy{font-size:9px}.ldsp-cdk-back-btn{padding:5px 10px;font-size:10px}.ldsp-cdk-detail-row{padding:6px 8px}.ldsp-cdk-detail-row .label,.ldsp-cdk-detail-row .value{font-size:9px}.ldsp-cdk-detail-tag{font-size:8px;padding:1px 6px}}
@@ -5785,6 +5894,20 @@
                 this._requests = new Map();
                 this._reqId = 0;
                 this._msgHandler = null;
+                // 小卖部相关
+                this._shopView = 'list'; // list, my, form, detail
+                this._shopProducts = [];
+                this._shopMyProducts = [];
+                this._shopCategories = [];
+                this._shopCategory = '';
+                this._shopProduct = null;
+                this._shopEditProduct = null;
+                // 小卖部缓存
+                this._shopProductsCache = new Map(); // categoryId -> { products, timestamp }
+                this._shopCategoriesCache = null; // { categories, timestamp }
+                this._shopCacheTTL = 60000; // 商品列表缓存 1 分钟
+                this._shopCategoriesCacheTTL = 300000; // 分类缓存 5 分钟
+                this._shopSubmitting = false; // 防重复提交锁
             }
 
             init() { 
@@ -5832,7 +5955,8 @@
                     </div>
                     <div class="ldsp-ldc-tabs">
                         <div class="ldsp-ldc-tab active" data-tab="overview">📊 概览</div>
-                        <div class="ldsp-ldc-tab" data-tab="transactions">📜 交易记录</div>
+                        <div class="ldsp-ldc-tab" data-tab="transactions">📜 记录</div>
+                        <div class="ldsp-ldc-tab" data-tab="shop">🏪 LD士多</div>
                         <div class="ldsp-ldc-tab" data-tab="support">❤️ 支持</div>
                     </div>
                     <div class="ldsp-ldc-body">
@@ -5864,9 +5988,11 @@
             _switchTab(tabId) {
                 this._tab = tabId;
                 this._order = null;
+                this._shopProduct = null;
                 this.overlay.querySelectorAll('.ldsp-ldc-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tabId));
                 if (tabId === 'overview') this._loadCache() || this._fetchData();
                 else if (tabId === 'transactions') this._fetchTrans(true);
+                else if (tabId === 'shop') this._renderShop();
                 else if (tabId === 'support') this._renderSupport();
             }
 
@@ -6350,6 +6476,664 @@
                 });
                 
                 this._scrollObserver.observe(sentinel);
+            }
+
+            // ==================== 小卖部功能 ====================
+            // 默认分类（与数据库保持一致，使用数字 ID）
+            static SHOP_CATEGORIES = [
+                { id: 1, name: 'AI', icon: '🤖' },
+                { id: 2, name: '存储', icon: '💾' },
+                { id: 3, name: '小鸡', icon: '🐔' },
+                { id: 4, name: '咨询', icon: '💬' }
+            ];
+
+            // 解包嵌套的 API 响应 { success, data: { success, data: {...} } } -> 内层 data
+            _unwrapShopResponse(resp) {
+                if (resp?.success && resp.data?.success && resp.data?.data) {
+                    return { success: true, data: resp.data.data };
+                }
+                return resp;
+            }
+
+            async _fetchShopCategories(forceRefresh = false) {
+                const now = Date.now();
+                // 检查缓存是否有效
+                if (!forceRefresh && this._shopCategoriesCache && (now - this._shopCategoriesCache.timestamp < this._shopCategoriesCacheTTL)) {
+                    return this._shopCategoriesCache.categories;
+                }
+                try {
+                    const resp = this._unwrapShopResponse(await this._shopRequest('/api/shop/categories'));
+                    if (resp?.success && resp.data?.categories) {
+                        this._shopCategories = resp.data.categories;
+                        this._shopCategoriesCache = { categories: resp.data.categories, timestamp: now };
+                        return resp.data.categories;
+                    }
+                } catch {}
+                return LDCManager.SHOP_CATEGORIES;
+            }
+
+            async _fetchShopProducts(categoryId = '', forceRefresh = false) {
+                const cacheKey = categoryId || '__all__';
+                const now = Date.now();
+                // 检查缓存是否有效
+                const cached = this._shopProductsCache.get(cacheKey);
+                if (!forceRefresh && cached && (now - cached.timestamp < this._shopCacheTTL)) {
+                    return cached.products;
+                }
+                try {
+                    const url = categoryId ? `/api/shop/products?categoryId=${encodeURIComponent(categoryId)}` : '/api/shop/products';
+                    const resp = this._unwrapShopResponse(await this._shopRequest(url));
+                    if (resp?.success && resp.data?.products) {
+                        this._shopProductsCache.set(cacheKey, { products: resp.data.products, timestamp: now });
+                        return resp.data.products;
+                    }
+                } catch {}
+                return [];
+            }
+            
+            // 清除商品缓存（发布/更新/删除后调用）
+            _invalidateShopCache() {
+                this._shopProductsCache.clear();
+            }
+
+            async _fetchMyProducts() {
+                try {
+                    const resp = this._unwrapShopResponse(await this._shopRequest('/api/shop/my-products'));
+                    if (resp?.success && resp.data?.products) {
+                        return resp.data.products;
+                    }
+                } catch {}
+                return [];
+            }
+
+            // 检查是否已登录（有 Token）
+            _hasToken() {
+                const tokenKey = `ldsp_${CURRENT_SITE.prefix}_leaderboard_token`;
+                return !!GM_getValue(tokenKey, null);
+            }
+
+            async _createProduct(data) {
+                // 检查登录状态
+                if (!this._hasToken()) {
+                    return { success: false, error: '请先在排行榜面板中登录后再发布物品' };
+                }
+                try {
+                    const resp = this._unwrapShopResponse(await this._shopRequest('/api/shop/products', 'POST', data));
+                    return resp;
+                } catch (e) {
+                    return { success: false, error: e.message || '创建失败' };
+                }
+            }
+
+            async _updateProduct(id, data) {
+                // 检查登录状态
+                if (!this._hasToken()) {
+                    return { success: false, error: '请先在排行榜面板中登录后再操作' };
+                }
+                try {
+                    const resp = this._unwrapShopResponse(await this._shopRequest(`/api/shop/my-products/${id}`, 'PUT', data));
+                    return resp;
+                } catch (e) {
+                    return { success: false, error: e.message || '更新失败' };
+                }
+            }
+
+            async _toggleProductStatus(id, active) {
+                try {
+                    // 下架使用 offline 接口，上架需要重新提交审核（这里简化处理）
+                    if (!active) {
+                        const resp = this._unwrapShopResponse(await this._shopRequest(`/api/shop/my-products/${id}/offline`, 'POST'));
+                        return resp;
+                    } else {
+                        // 上架商品 - 更新状态为 pending 等待审核
+                        const resp = this._unwrapShopResponse(await this._shopRequest(`/api/shop/my-products/${id}`, 'PUT', { status: 'pending' }));
+                        return resp;
+                    }
+                } catch (e) {
+                    return { success: false, error: e.message || '操作失败' };
+                }
+            }
+
+            async _recordProductView(id) {
+                // 获取商品详情时会自动记录浏览量，这里不需要单独调用
+                // 保留空实现以防后续需要
+            }
+
+            async _shopRequest(path, method = 'GET', body = null) {
+                const API_BASE = (typeof ApiService !== 'undefined' && ApiService.baseUrl) || 'https://api.ldspro.qzz.io';
+                const url = API_BASE + path;
+                
+                // 获取 JWT Token 用于认证（存储键格式：ldsp_{site_prefix}_leaderboard_token）
+                // CURRENT_SITE.prefix 对于 linux.do 是 'linux_do'
+                const tokenKey = `ldsp_${CURRENT_SITE.prefix}_leaderboard_token`;
+                const token = GM_getValue(tokenKey, null);
+                
+                // 调试日志
+                console.log('[LDStatus Pro Shop] Request:', { url, method, tokenKey, hasToken: !!token, tokenPreview: token ? token.substring(0, 20) + '...' : null });
+                
+                const headers = {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                };
+                if (token) {
+                    headers['Authorization'] = `Bearer ${token}`;
+                }
+                
+                return new Promise((resolve, reject) => {
+                    GM_xmlhttpRequest({
+                        method,
+                        url,
+                        headers,
+                        data: body ? JSON.stringify(body) : undefined,
+                        withCredentials: true,
+                        timeout: 15000,
+                        onload: r => {
+                            if (r.status >= 200 && r.status < 300) {
+                                try {
+                                    resolve(JSON.parse(r.responseText));
+                                } catch {
+                                    resolve({ success: false, error: '响应解析失败' });
+                                }
+                            } else {
+                                try {
+                                    const err = JSON.parse(r.responseText);
+                                    // 确保 error 是字符串
+                                    const errMsg = typeof err.error === 'string' ? err.error :
+                                                   (err.error?.message || err.message || `请求失败 (${r.status})`);
+                                    resolve({ success: false, error: errMsg });
+                                } catch {
+                                    resolve({ success: false, error: `请求失败 (${r.status})` });
+                                }
+                            }
+                        },
+                        onerror: () => resolve({ success: false, error: '网络错误' }),
+                        ontimeout: () => resolve({ success: false, error: '请求超时' })
+                    });
+                });
+            }
+
+            async _renderShop() {
+                const body = this.overlay.querySelector('.ldsp-ldc-body');
+                body.innerHTML = `<div class="ldsp-ldc-loading"><div class="ldsp-spinner"></div><div>加载中...</div></div>`;
+                
+                // 并行获取分类和商品
+                const [categories, products] = await Promise.all([
+                    this._fetchShopCategories(),
+                    this._fetchShopProducts(this._shopCategory)
+                ]);
+                
+                this._shopCategories = categories.length > 0 ? categories : LDCManager.SHOP_CATEGORIES;
+                this._shopProducts = products;
+                this._shopView = 'list';
+                this._renderShopList();
+            }
+
+            _renderShopList() {
+                const body = this.overlay.querySelector('.ldsp-ldc-body');
+                const categories = this._shopCategories;
+                const products = this._shopProducts;
+                
+                // 修复：使用 String 转换确保比较正确
+                const currentCategory = String(this._shopCategory || '');
+                const categoryChips = [
+                    `<div class="ldsp-shop-filter-chip${!currentCategory ? ' active' : ''}" data-category="">🏷️ 全部</div>`,
+                    ...categories.map(c => `<div class="ldsp-shop-filter-chip${currentCategory === String(c.id) ? ' active' : ''}" data-category="${c.id}">${c.icon || '📦'} ${c.name}</div>`)
+                ].join('');
+
+                const productCards = products.length > 0 ? products.map(p => this._renderShopCard(p, categories)).join('') : '';
+
+                body.innerHTML = `
+                    <div class="ldsp-shop">
+                        <div class="ldsp-shop-header">
+                            <div class="ldsp-shop-tabs">
+                                <div class="ldsp-shop-tab active" data-view="list">🛒 物品列表</div>
+                                <div class="ldsp-shop-tab" data-view="my">📦 我的物品</div>
+                            </div>
+                            <button class="ldsp-shop-add-btn" data-action="add">➕ 发布</button>
+                        </div>
+                        <div class="ldsp-shop-filter">${categoryChips}</div>
+                        ${products.length > 0 ? `<div class="ldsp-shop-grid">${productCards}</div>` : 
+                        `<div class="ldsp-shop-empty"><div class="ldsp-shop-empty-icon">🏪</div><div class="ldsp-shop-empty-text">暂无物品</div><div class="ldsp-shop-empty-hint">快来发布第一个物品吧~</div></div>`}
+                    </div>`;
+
+                this._bindShopListEvents(body);
+            }
+            
+            // 格式化头像 URL
+            _formatAvatar(avatar, username) {
+                if (avatar && avatar.trim()) return avatar.trim();
+                return '';
+            }
+            
+            // 生成随机浅色背景
+            _getRandomLightColor(seed) {
+                const colors = [
+                    'linear-gradient(135deg,#e0f2fe,#bae6fd)', // 浅蓝
+                    'linear-gradient(135deg,#fce7f3,#fbcfe8)', // 浅粉
+                    'linear-gradient(135deg,#d1fae5,#a7f3d0)', // 浅绿
+                    'linear-gradient(135deg,#fef3c7,#fde68a)', // 浅黄
+                    'linear-gradient(135deg,#ede9fe,#ddd6fe)', // 浅紫
+                    'linear-gradient(135deg,#ffedd5,#fed7aa)', // 浅橙
+                    'linear-gradient(135deg,#e0e7ff,#c7d2fe)', // 浅靖蓝
+                    'linear-gradient(135deg,#f5f5f4,#e7e5e4)'  // 浅灰
+                ];
+                const index = seed ? Math.abs(seed) % colors.length : Math.floor(Math.random() * colors.length);
+                return colors[index];
+            }
+            
+            // 渲染单个商品卡片
+            _renderShopCard(p, categories) {
+                const price = parseFloat(p.price) || 0;
+                const discount = parseFloat(p.discount) || 1;
+                const finalPrice = (price * discount).toFixed(2);
+                const hasDiscount = discount < 1;
+                const hasImg = p.image_url && p.image_url.trim();
+                const cat = categories.find(c => c.id === p.category_id);
+                const catIcon = p.category_icon || cat?.icon || '📦';
+                const catName = p.category_name || cat?.name || '其他';
+                const sellerAvatar = this._formatAvatar(p.seller_avatar, p.seller_username);
+                const updateTime = this._formatRelativeTime(p.updated_at || p.created_at);
+                const bgColor = this._getRandomLightColor(p.id);
+                
+                return `<div class="ldsp-shop-card" data-product-id="${p.id}">
+                    ${hasDiscount ? `<div class="ldsp-shop-card-discount">-${Math.round((1 - discount) * 100)}%</div>` : ''}
+                    <div class="ldsp-shop-card-cover" style="${hasImg ? '' : `background:${bgColor}`}">
+                        ${hasImg ? `<img src="${Utils.escapeHtml(p.image_url)}" alt="" onerror="this.style.display='none';this.parentElement.innerHTML='${catIcon}';this.parentElement.style.background='${bgColor.replace(/'/g, "\\'")}'"}>` : catIcon}
+                    </div>
+                    <div class="ldsp-shop-card-body">
+                        <div class="ldsp-shop-card-name">${Utils.escapeHtml(p.name)}</div>
+                        <div class="ldsp-shop-card-meta">
+                            <span class="ldsp-shop-card-category">${Utils.escapeHtml(catName)}</span>
+                            <span class="ldsp-shop-card-time">${updateTime}</span>
+                        </div>
+                        <div class="ldsp-shop-card-seller">
+                            <img class="ldsp-shop-card-seller-avatar" src="${sellerAvatar}" alt="" onerror="this.style.display='none'">
+                            ${Utils.escapeHtml(p.seller_username || '匿名')}
+                        </div>
+                        <div class="ldsp-shop-card-footer">
+                            <div class="ldsp-shop-card-price${hasDiscount ? ' discounted' : ''}">${finalPrice}<span>LDC</span>${hasDiscount ? `<span class="ldsp-shop-card-original">${price.toFixed(2)}</span>` : ''}</div>
+                            <div class="ldsp-shop-card-views">👁${p.view_count || 0}</div>
+                        </div>
+                    </div>
+                </div>`;
+            }
+            
+            // 格式化相对时间
+            _formatRelativeTime(timestamp) {
+                if (!timestamp) return '';
+                const now = Date.now();
+                const diff = now - timestamp;
+                const minutes = Math.floor(diff / 60000);
+                const hours = Math.floor(diff / 3600000);
+                const days = Math.floor(diff / 86400000);
+                if (minutes < 1) return '刚刚';
+                if (minutes < 60) return `${minutes}分钟前`;
+                if (hours < 24) return `${hours}小时前`;
+                if (days < 30) return `${days}天前`;
+                return new Date(timestamp).toLocaleDateString('zh-CN');
+            }
+
+            _bindShopListEvents(body) {
+                // Tab 切换
+                body.querySelectorAll('.ldsp-shop-tab').forEach(tab => {
+                    tab.addEventListener('click', () => {
+                        if (tab.dataset.view === 'my') this._renderShopMy();
+                    });
+                });
+                
+                // 分类筛选
+                body.querySelectorAll('.ldsp-shop-filter-chip').forEach(chip => {
+                    chip.addEventListener('click', async () => {
+                        const category = chip.dataset.category || '';
+                        const currentCategory = String(this._shopCategory || '');
+                        if (category !== currentCategory) {
+                            this._shopCategory = category;
+                            // 先更新 UI 状态再加载
+                            body.querySelectorAll('.ldsp-shop-filter-chip').forEach(c => {
+                                c.classList.toggle('active', (c.dataset.category || '') === category);
+                            });
+                            // 显示加载中
+                            const grid = body.querySelector('.ldsp-shop-grid') || body.querySelector('.ldsp-shop-empty');
+                            if (grid) grid.innerHTML = `<div class="ldsp-ldc-loading" style="grid-column:1/-1"><div class="ldsp-spinner"></div><div>加载中...</div></div>`;
+                            this._shopProducts = await this._fetchShopProducts(category);
+                            this._renderShopList();
+                        }
+                    });
+                });
+                
+                // 发布按钮
+                body.querySelector('.ldsp-shop-add-btn')?.addEventListener('click', () => {
+                    this._shopEditProduct = null;
+                    this._renderShopForm();
+                });
+                
+                // 商品卡片点击
+                body.querySelectorAll('.ldsp-shop-card').forEach(card => {
+                    card.addEventListener('click', () => {
+                        const id = parseInt(card.dataset.productId);
+                        const product = this._shopProducts.find(p => p.id === id);
+                        if (product) this._showProductDetail(product);
+                    });
+                });
+            }
+
+            async _renderShopMy() {
+                const body = this.overlay.querySelector('.ldsp-ldc-body');
+                body.innerHTML = `<div class="ldsp-ldc-loading"><div class="ldsp-spinner"></div><div>加载中...</div></div>`;
+                
+                this._shopMyProducts = await this._fetchMyProducts();
+                this._shopView = 'my';
+                
+                const products = this._shopMyProducts;
+                const categories = this._shopCategories;
+                
+                const productList = products.length > 0 ? products.map(p => {
+                    const hasImg = p.image_url && p.image_url.trim();
+                    const cat = categories.find(c => c.id === p.category_id);
+                    const catIcon = p.category_icon || cat?.icon || '📦';
+                    const catName = p.category_name || cat?.name || '其他';
+                    // 商品状态: approved=在售, pending=待审核, rejected=已拒绝, offline=已下架
+                    const status = p.status || 'pending';
+                    const statusMap = {
+                        'approved': { text: '在售', class: 'active' },
+                        'pending': { text: '待审核', class: 'inactive' },
+                        'rejected': { text: '已拒绝', class: 'inactive' },
+                        'offline': { text: '已下架', class: 'inactive' }
+                    };
+                    const statusInfo = statusMap[status] || statusMap['pending'];
+                    
+                    return `<div class="ldsp-shop-my-card" data-product-id="${p.id}">
+                        <div class="ldsp-shop-my-card-status ${statusInfo.class}">${statusInfo.text}</div>
+                        ${hasImg ? `<img class="ldsp-shop-my-card-img" src="${Utils.escapeHtml(p.image_url)}" alt="${Utils.escapeHtml(p.name)}" onerror="this.parentElement.querySelector('.ldsp-shop-my-card-img-placeholder')?.classList.remove('hidden')">` : 
+                        `<div class="ldsp-shop-my-card-img-placeholder">${catIcon}</div>`}
+                        <div class="ldsp-shop-my-card-info">
+                            <div class="ldsp-shop-my-card-name">${Utils.escapeHtml(p.name)}</div>
+                            <div class="ldsp-shop-my-card-meta">
+                                <span>${catIcon} ${Utils.escapeHtml(catName)}</span>
+                                <span>👁️ ${p.view_count || 0}</span>
+                            </div>
+                            <div class="ldsp-shop-my-card-price">${parseFloat(p.price).toFixed(2)} LDC</div>
+                            <div class="ldsp-shop-my-card-actions">
+                                <button class="ldsp-shop-my-card-btn" data-action="edit" data-id="${p.id}">编辑</button>
+                                ${status === 'approved' ? `<button class="ldsp-shop-my-card-btn danger" data-action="toggle" data-id="${p.id}">下架</button>` : ''}
+                                ${status === 'offline' ? `<button class="ldsp-shop-my-card-btn" data-action="toggle" data-id="${p.id}">重新上架</button>` : ''}
+                            </div>
+                        </div>
+                    </div>`;
+                }).join('') : '';
+
+                body.innerHTML = `
+                    <div class="ldsp-shop">
+                        <div class="ldsp-shop-header">
+                            <div class="ldsp-shop-tabs">
+                                <div class="ldsp-shop-tab" data-view="list">物品列表</div>
+                                <div class="ldsp-shop-tab active" data-view="my">我的物品</div>
+                            </div>
+                            <button class="ldsp-shop-add-btn" data-action="add">+ 发布</button>
+                        </div>
+                        ${products.length > 0 ? `<div class="ldsp-shop-my-list">${productList}</div>` : 
+                        `<div class="ldsp-shop-empty"><div class="ldsp-shop-empty-icon">📭</div><div class="ldsp-shop-empty-text">您还没有发布物品</div><div class="ldsp-shop-empty-hint">点击上方按钮发布您的第一个物品</div></div>`}
+                    </div>`;
+
+                this._bindShopMyEvents(body);
+            }
+
+            _bindShopMyEvents(body) {
+                // Tab 切换
+                body.querySelectorAll('.ldsp-shop-tab').forEach(tab => {
+                    tab.addEventListener('click', () => {
+                        if (tab.dataset.view === 'list') {
+                            this._shopCategory = '';
+                            this._renderShop();
+                        }
+                    });
+                });
+                
+                // 发布按钮
+                body.querySelector('.ldsp-shop-add-btn')?.addEventListener('click', () => {
+                    this._shopEditProduct = null;
+                    this._renderShopForm();
+                });
+                
+                // 编辑/上下架按钮
+                body.querySelectorAll('.ldsp-shop-my-card-btn').forEach(btn => {
+                    btn.addEventListener('click', async (e) => {
+                        e.stopPropagation();
+                        const id = parseInt(btn.dataset.id);
+                        const action = btn.dataset.action;
+                        const product = this._shopMyProducts.find(p => p.id === id);
+                        
+                        if (action === 'edit' && product) {
+                            this._shopEditProduct = product;
+                            this._renderShopForm();
+                        } else if (action === 'toggle' && product) {
+                            btn.disabled = true;
+                            const originalText = btn.textContent;
+                            btn.textContent = '处理中...';
+                            const isApproved = product.status === 'approved';
+                            const resp = await this._toggleProductStatus(id, !isApproved);
+                            if (resp?.success) {
+                                this._renderShopMy();
+                            } else {
+                                btn.disabled = false;
+                                btn.textContent = originalText;
+                                alert(resp?.error || '操作失败');
+                            }
+                        }
+                    });
+                });
+            }
+
+            _renderShopForm() {
+                const body = this.overlay.querySelector('.ldsp-ldc-body');
+                const isEdit = !!this._shopEditProduct;
+                const p = this._shopEditProduct || {};
+                const categories = this._shopCategories;
+                
+                const categoryOptions = categories.map(c => 
+                    `<option value="${c.id}"${p.category_id === c.id ? ' selected' : ''}>${c.icon || '📦'} ${c.name}</option>`
+                ).join('');
+
+                body.innerHTML = `
+                    <div class="ldsp-shop-form">
+                        <div class="ldsp-shop-form-header">
+                            <button class="ldsp-shop-back-btn">← 返回</button>
+                            <div class="ldsp-shop-form-title">${isEdit ? '编辑物品' : '发布物品'}</div>
+                        </div>
+                        <div class="ldsp-shop-form-group">
+                            <label class="ldsp-shop-form-label">物品名称 <span class="required">*</span></label>
+                            <input type="text" class="ldsp-shop-form-input" id="shop-name" placeholder="请输入物品名称" value="${Utils.escapeHtml(p.name || '')}" maxlength="100">
+                        </div>
+                        <div class="ldsp-shop-form-group">
+                            <label class="ldsp-shop-form-label">物品分类 <span class="required">*</span></label>
+                            <select class="ldsp-shop-form-select" id="shop-category">${categoryOptions}</select>
+                        </div>
+                        <div class="ldsp-shop-form-group">
+                            <label class="ldsp-shop-form-label">物品描述 <span class="required">*</span></label>
+                            <textarea class="ldsp-shop-form-input ldsp-shop-form-textarea" id="shop-desc" placeholder="详细描述您的物品..." maxlength="2000">${Utils.escapeHtml(p.description || '')}</textarea>
+                        </div>
+                        <div class="ldsp-shop-form-row">
+                            <div class="ldsp-shop-form-group">
+                                <label class="ldsp-shop-form-label">价格 (LDC) <span class="required">*</span></label>
+                                <input type="number" class="ldsp-shop-form-input" id="shop-price" placeholder="0.00" min="0" step="0.01" value="${p.price || ''}">
+                            </div>
+                            <div class="ldsp-shop-form-group">
+                                <label class="ldsp-shop-form-label">折扣</label>
+                                <input type="number" class="ldsp-shop-form-input" id="shop-discount" placeholder="1 (无折扣)" min="0" max="1" step="0.01" value="${p.discount !== undefined && p.discount !== 1 ? p.discount : ''}">
+                                <span class="ldsp-shop-form-hint">0-1之间，如 0.8 表示八折</span>
+                            </div>
+                        </div>
+                        <div class="ldsp-shop-form-group">
+                            <label class="ldsp-shop-form-label">积分流转链接 <span class="required">*</span></label>
+                            <input type="url" class="ldsp-shop-form-input" id="shop-payment-url" placeholder="https://credit.linux.do/paying/..." value="${Utils.escapeHtml(p.payment_link || '')}">
+                            <span class="ldsp-shop-form-hint">LDC 积分流转链接，买家点击兑换后跳转此链接</span>
+                        </div>
+                        <div class="ldsp-shop-form-group">
+                            <label class="ldsp-shop-form-label">物品图片 (可选)</label>
+                            <input type="url" class="ldsp-shop-form-input" id="shop-image" placeholder="https://..." value="${Utils.escapeHtml(p.image_url || '')}">
+                            <span class="ldsp-shop-form-hint">图片URL地址，建议使用 https 链接</span>
+                        </div>
+                        <div class="ldsp-shop-form-actions">
+                            <button class="ldsp-shop-form-btn secondary" data-action="cancel">取消</button>
+                            <button class="ldsp-shop-form-btn primary" data-action="submit">${isEdit ? '保存修改' : '发布物品'}</button>
+                        </div>
+                    </div>`;
+
+                this._bindShopFormEvents(body, isEdit);
+            }
+
+            _bindShopFormEvents(body, isEdit) {
+                // 返回/取消按钮
+                body.querySelector('.ldsp-shop-back-btn')?.addEventListener('click', () => {
+                    isEdit ? this._renderShopMy() : this._renderShopList();
+                });
+                body.querySelector('[data-action="cancel"]')?.addEventListener('click', () => {
+                    isEdit ? this._renderShopMy() : this._renderShopList();
+                });
+                
+                // 提交按钮
+                body.querySelector('[data-action="submit"]')?.addEventListener('click', async () => {
+                    // 防重复提交
+                    if (this._shopSubmitting) {
+                        return;
+                    }
+                    
+                    const name = body.querySelector('#shop-name')?.value?.trim();
+                    const categoryIdRaw = body.querySelector('#shop-category')?.value;
+                    const categoryId = categoryIdRaw ? parseInt(categoryIdRaw, 10) : null;
+                    const description = body.querySelector('#shop-desc')?.value?.trim();
+                    const price = parseFloat(body.querySelector('#shop-price')?.value) || 0;
+                    const discount = parseFloat(body.querySelector('#shop-discount')?.value) || 1;
+                    const paymentLink = body.querySelector('#shop-payment-url')?.value?.trim();
+                    const imageUrl = body.querySelector('#shop-image')?.value?.trim();
+
+                    // 增强验证（与服务端保持一致）
+                    if (!name) { alert('请输入物品名称'); return; }
+                    if (name.length < 2 || name.length > 50) { alert('物品名称需要2-50个字符'); return; }
+                    if (!categoryId || isNaN(categoryId)) { alert('请选择物品分类'); return; }
+                    if (!description) { alert('请输入物品描述'); return; }
+                    if (description.length < 10 || description.length > 1000) { alert('物品描述需要10-1000个字符'); return; }
+                    if (price <= 0 || price > 99999999) { alert('请输入有效价格（0-99999999）'); return; }
+                    if (discount < 0.01 || discount > 1) { alert('折扣范围为0.01-1'); return; }
+                    if (!paymentLink) { alert('请输入积分流转链接'); return; }
+                    if (!paymentLink.startsWith('https://credit.linux.do/')) {
+                        alert('积分流转链接必须是 credit.linux.do 的链接'); return;
+                    }
+                    // 图片URL验证（可选字段）
+                    if (imageUrl && !imageUrl.startsWith('https://')) {
+                        alert('图片链接请使用 https 开头的安全链接'); return;
+                    }
+
+                    const data = { name, categoryId, description, price, discount, paymentLink, imageUrl };
+                    
+                    const btn = body.querySelector('[data-action="submit"]');
+                    btn.disabled = true;
+                    btn.textContent = '提交中...';
+                    this._shopSubmitting = true;
+
+                    let resp;
+                    if (isEdit) {
+                        resp = await this._updateProduct(this._shopEditProduct.id, data);
+                    } else {
+                        resp = await this._createProduct(data);
+                    }
+
+                    this._shopSubmitting = false;
+                    if (resp?.success) {
+                        this._shopEditProduct = null;
+                        this._invalidateShopCache(); // 清除缓存
+                        this._renderShopMy();
+                    } else {
+                        btn.disabled = false;
+                        btn.textContent = isEdit ? '保存修改' : '发布物品';
+                        // 处理 error 可能是对象的情况
+                        const errMsg = typeof resp?.error === 'string' ? resp.error : 
+                                       (resp?.error?.message || resp?.message || '操作失败');
+                        alert(errMsg);
+                    }
+                });
+            }
+
+            async _showProductDetail(product) {
+                this._shopProduct = product;
+                this._shopView = 'detail';
+                
+                // 记录浏览量（通过获取详情 API 自动记录）
+                this._recordProductView(product.id);
+                
+                const body = this.overlay.querySelector('.ldsp-ldc-body');
+                const categories = this._shopCategories;
+                const cat = categories.find(c => c.id === product.category_id);
+                const catIcon = product.category_icon || cat?.icon || '📦';
+                const catName = product.category_name || cat?.name || '其他';
+                
+                const price = parseFloat(product.price) || 0;
+                const discount = parseFloat(product.discount) || 1;
+                const finalPrice = (price * discount).toFixed(2);
+                const hasDiscount = discount < 1;
+                const hasImg = product.image_url && product.image_url.trim();
+                
+                // 格式化时间
+                const createdAt = product.created_at ? new Date(product.created_at).toLocaleString('zh-CN') : '—';
+                const updatedAt = product.updated_at ? new Date(product.updated_at).toLocaleString('zh-CN') : createdAt;
+
+                // 格式化卖家头像
+                const sellerAvatar = this._formatAvatar(product.seller_avatar, product.seller_username);
+                
+                // 无图片时的占位背景
+                const bgColor = this._getRandomLightColor(product.id);
+                
+                body.innerHTML = `
+                    <div class="ldsp-shop-detail">
+                        <div class="ldsp-shop-detail-header">
+                            <button class="ldsp-shop-back-btn">←</button>
+                            <span class="ldsp-shop-detail-category">${catIcon} ${Utils.escapeHtml(catName)}</span>
+                        </div>
+                        ${hasImg ? 
+                            `<img class="ldsp-shop-detail-img" src="${Utils.escapeHtml(product.image_url)}" alt="" onerror="this.outerHTML='<div class=ldsp-shop-detail-placeholder style=background:${bgColor.replace(/'/g, '')}>${catIcon}</div>'">` : 
+                            `<div class="ldsp-shop-detail-placeholder" style="background:${bgColor}">${catIcon}</div>`
+                        }
+                        <div class="ldsp-shop-detail-content">
+                            <div class="ldsp-shop-detail-name">${Utils.escapeHtml(product.name)}</div>
+                            <div class="ldsp-shop-detail-desc">${Utils.escapeHtml(product.description || '暂无描述')}</div>
+                        </div>
+                        <div class="ldsp-shop-detail-price-row">
+                            <div class="ldsp-shop-detail-price${hasDiscount ? ' discounted' : ''}">${finalPrice} <span>LDC</span></div>
+                            ${hasDiscount ? `<div class="ldsp-shop-detail-original">${price.toFixed(2)}</div>` : ''}
+                            ${hasDiscount ? `<div class="ldsp-shop-detail-discount-badge">-${Math.round((1 - discount) * 100)}%</div>` : ''}
+                        </div>
+                        <div class="ldsp-shop-detail-info">
+                            <span class="ldsp-shop-detail-info-item">👁 ${product.view_count || 0}</span>
+                            <span class="ldsp-shop-detail-info-item">📅 ${this._formatRelativeTime(product.updated_at || product.created_at)}</span>
+                        </div>
+                        <div class="ldsp-shop-seller" data-username="${Utils.escapeHtml(product.seller_username || '')}">
+                            <img class="ldsp-shop-seller-avatar" src="${sellerAvatar}" alt="" onerror="this.style.display='none'">
+                            <div class="ldsp-shop-seller-info">
+                                <div class="ldsp-shop-seller-name">@${Utils.escapeHtml(product.seller_username || '未知')}</div>
+                                <div class="ldsp-shop-seller-label">立即联系提供者 📧</div>
+                            </div>
+                            <span class="ldsp-shop-seller-arrow">→</span>
+                        </div>
+                        <a href="${Utils.escapeHtml(product.payment_link || '')}" target="_blank" class="ldsp-shop-purchase-action" rel="noopener">🛒 立即兑换</a>
+                    </div>`;
+
+                this._bindProductDetailEvents(body);
+            }
+
+            _bindProductDetailEvents(body) {
+                // 返回按钮
+                body.querySelector('.ldsp-shop-back-btn')?.addEventListener('click', () => {
+                    this._shopProduct = null;
+                    this._renderShopList();
+                });
+                
+                // 卖家点击
+                body.querySelector('.ldsp-shop-seller')?.addEventListener('click', () => {
+                    const username = body.querySelector('.ldsp-shop-seller')?.dataset?.username;
+                    if (username) {
+                        window.open(`https://linux.do/u/${username}`, '_blank');
+                    }
+                });
             }
 
             static SUPPORT_TIERS = [
