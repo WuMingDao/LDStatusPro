@@ -1,7 +1,7 @@
     // ==UserScript==
     // @name         LDStatus Pro
     // @namespace    http://tampermonkey.net/
-    // @version      3.5.4.0
+    // @version      3.5.4.1
     // @description  在 Linux.do 和 IDCFlare 页面显示信任级别进度，支持历史趋势、里程碑通知、阅读时间统计、排行榜系统、我的活动查看。两站点均支持排行榜和云同步功能
     // @author       JackLiii
     // @license      MIT
@@ -4652,29 +4652,29 @@
     .ldsp-cdk-upload-btn{padding:8px 16px;border:none;border-radius:var(--r-sm);font-size:11px;font-weight:600;background:var(--accent);color:#fff;cursor:pointer;transition:all .15s}
     .ldsp-cdk-upload-btn:hover{filter:brightness(1.1)}
     .ldsp-cdk-upload-btn:disabled{opacity:.6;cursor:not-allowed}
-    .ldsp-cdk-list-section{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-md);padding:14px;display:flex;flex-direction:column;gap:10px;overflow:hidden;min-height:100px}
-    .ldsp-cdk-list-header{display:flex;justify-content:space-between;align-items:center;font-size:11px;font-weight:600;color:var(--txt-sec);flex-shrink:0}
-    .ldsp-cdk-filter-select{padding:4px 8px;border:1px solid var(--border);border-radius:var(--r-sm);font-size:10px;color:var(--txt);background:var(--bg-el)}
-    .ldsp-cdk-list{display:flex;flex-direction:column;gap:6px;max-height:240px;overflow-y:auto;flex:1}
-    .ldsp-cdk-item{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:10px;padding:10px 12px;background:var(--bg-el);border:1px solid var(--border);border-radius:var(--r-sm);min-height:40px}
-    .ldsp-cdk-item-code{font-size:12px;font-family:'Consolas','Monaco','Courier New',monospace;color:var(--txt);word-break:break-all;line-height:1.4}
-    .ldsp-cdk-item-meta{display:flex;flex-direction:column;gap:4px;align-items:flex-end;flex-shrink:0}
-    .ldsp-cdk-item-status{padding:3px 8px;font-size:9px;font-weight:600;border-radius:4px;white-space:nowrap}
-    .ldsp-cdk-item-status.available{background:rgba(34,197,94,.2);color:#22c55e}
-    .ldsp-cdk-item-status.locked{background:rgba(234,179,8,.2);color:#eab308}
-    .ldsp-cdk-item-status.sold{background:rgba(107,114,128,.2);color:#6b7280}
-    .ldsp-cdk-item-remark{font-size:9px;color:var(--txt-mut);max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .ldsp-cdk-item-delete{width:24px;height:24px;display:flex;align-items:center;justify-content:center;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--bg-card);font-size:14px;color:var(--txt-mut);cursor:pointer;transition:all .15s;flex-shrink:0}
-    .ldsp-cdk-item-delete:hover{color:#fff;background:var(--err);border-color:var(--err)}
-    .ldsp-cdk-pagination{display:flex;justify-content:space-between;align-items:center;padding-top:10px;border-top:1px dashed var(--border);font-size:10px;color:var(--txt-mut);flex-shrink:0}
-    .ldsp-cdk-pagination-btns{display:flex;gap:6px}
-    .ldsp-cdk-page-btn{padding:5px 12px;border:1px solid var(--border);border-radius:var(--r-sm);font-size:10px;color:var(--txt-sec);background:var(--bg-el);cursor:pointer;transition:all .15s}
-    .ldsp-cdk-page-btn:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
-    .ldsp-cdk-page-btn:disabled{opacity:.5;cursor:not-allowed}
-    .ldsp-cdk-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;gap:10px;color:var(--txt-mut)}
-    .ldsp-cdk-empty-icon{font-size:36px;opacity:.5}
-    .ldsp-cdk-empty-text{font-size:13px;font-weight:500}
-    .ldsp-cdk-empty-hint{font-size:10px}
+    .ldsp-shop-cdk-mgr-section{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-md);padding:14px;display:flex;flex-direction:column;gap:10px;overflow:hidden;min-height:100px}
+    .ldsp-shop-cdk-mgr-header{display:flex;justify-content:space-between;align-items:center;font-size:11px;font-weight:600;color:var(--txt-sec);flex-shrink:0}
+    .ldsp-shop-cdk-mgr-filter{padding:4px 8px;border:1px solid var(--border);border-radius:var(--r-sm);font-size:10px;color:var(--txt);background:var(--bg-el)}
+    .ldsp-shop-cdk-mgr-list{display:flex;flex-direction:column;gap:6px;max-height:240px;overflow-y:auto;flex:1}
+    .ldsp-shop-cdk-mgr-item{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:10px;padding:10px 12px;background:var(--bg-el);border:1px solid var(--border);border-radius:var(--r-sm);min-height:40px}
+    .ldsp-shop-cdk-mgr-code{font-size:12px;font-family:'Consolas','Monaco','Courier New',monospace;color:var(--txt);word-break:break-all;line-height:1.4}
+    .ldsp-shop-cdk-mgr-meta{display:flex;flex-direction:column;gap:4px;align-items:flex-end;flex-shrink:0}
+    .ldsp-shop-cdk-mgr-status{padding:3px 8px;font-size:9px;font-weight:600;border-radius:4px;white-space:nowrap}
+    .ldsp-shop-cdk-mgr-status.available{background:rgba(34,197,94,.2);color:#22c55e}
+    .ldsp-shop-cdk-mgr-status.locked{background:rgba(234,179,8,.2);color:#eab308}
+    .ldsp-shop-cdk-mgr-status.sold{background:rgba(107,114,128,.2);color:#6b7280}
+    .ldsp-shop-cdk-mgr-remark{font-size:9px;color:var(--txt-mut);max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .ldsp-shop-cdk-mgr-delete{width:24px;height:24px;display:flex;align-items:center;justify-content:center;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--bg-card);font-size:14px;color:var(--txt-mut);cursor:pointer;transition:all .15s;flex-shrink:0}
+    .ldsp-shop-cdk-mgr-delete:hover{color:#fff;background:var(--err);border-color:var(--err)}
+    .ldsp-shop-cdk-mgr-pagination{display:flex;justify-content:space-between;align-items:center;padding-top:10px;border-top:1px dashed var(--border);font-size:10px;color:var(--txt-mut);flex-shrink:0}
+    .ldsp-shop-cdk-mgr-pagination-btns{display:flex;gap:6px}
+    .ldsp-shop-cdk-mgr-page-btn{padding:5px 12px;border:1px solid var(--border);border-radius:var(--r-sm);font-size:10px;color:var(--txt-sec);background:var(--bg-el);cursor:pointer;transition:all .15s}
+    .ldsp-shop-cdk-mgr-page-btn:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+    .ldsp-shop-cdk-mgr-page-btn:disabled{opacity:.5;cursor:not-allowed}
+    .ldsp-shop-cdk-mgr-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;gap:10px;color:var(--txt-mut)}
+    .ldsp-shop-cdk-mgr-empty-icon{font-size:36px;opacity:.5}
+    .ldsp-shop-cdk-mgr-empty-text{font-size:13px;font-weight:500}
+    .ldsp-shop-cdk-mgr-empty-hint{font-size:10px}
     .ldsp-shop-my-card-type{position:absolute;top:0;left:0;padding:3px 8px;font-size:8px;font-weight:700;border-radius:var(--r-sm) 0 6px 0;background:linear-gradient(135deg,#fbbf24 0%,#f59e0b 100%);color:#1c1917;letter-spacing:.3px;z-index:2}
     .ldsp-shop-my-card-stock{display:inline-flex;align-items:center;gap:2px;padding:2px 6px;border-radius:4px;font-size:9px;font-weight:600;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.2)}
     .ldsp-shop-my-card-stock .available{color:#22c55e;font-weight:700}
@@ -8643,11 +8643,11 @@
                             </div>
                         </div>
                         
-                        <div class="ldsp-cdk-list-section">
-                            <div class="ldsp-cdk-list-header">
+                        <div class="ldsp-shop-cdk-mgr-section">
+                            <div class="ldsp-shop-cdk-mgr-header">
                                 <span>📋 CDK 列表</span>
-                                <div class="ldsp-cdk-filter">
-                                    <select class="ldsp-cdk-filter-select" id="cdk-filter-status">
+                                <div class="ldsp-shop-cdk-mgr-filter-wrap">
+                                    <select class="ldsp-shop-cdk-mgr-filter" id="cdk-filter-status">
                                         <option value="all"${currentStatus === 'all' ? ' selected' : ''}>全部</option>
                                         <option value="available"${currentStatus === 'available' ? ' selected' : ''}>可用</option>
                                         <option value="locked"${currentStatus === 'locked' ? ' selected' : ''}>锁定</option>
@@ -8657,32 +8657,32 @@
                             </div>
                             
                             ${cdks.length > 0 ? `
-                            <div class="ldsp-cdk-list">
+                            <div class="ldsp-shop-cdk-mgr-list">
                                 ${cdks.map(c => `
-                                    <div class="ldsp-cdk-item" data-id="${c.id}">
-                                        <div class="ldsp-cdk-item-code" title="${Utils.escapeHtml(c.code)}">${Utils.escapeHtml(c.code)}</div>
-                                        <div class="ldsp-cdk-item-meta">
-                                            <span class="ldsp-cdk-item-status ${c.status}">${c.status === 'available' ? '✓ 可用' : c.status === 'locked' ? '⏳ 锁定' : '✗ 已售'}</span>
-                                            ${c.remark ? `<span class="ldsp-cdk-item-remark" title="${Utils.escapeHtml(c.remark)}">${Utils.escapeHtml(c.remark)}</span>` : ''}
+                                    <div class="ldsp-shop-cdk-mgr-item" data-id="${c.id}">
+                                        <div class="ldsp-shop-cdk-mgr-code" title="${Utils.escapeHtml(c.code)}">${Utils.escapeHtml(c.code)}</div>
+                                        <div class="ldsp-shop-cdk-mgr-meta">
+                                            <span class="ldsp-shop-cdk-mgr-status ${c.status}">${c.status === 'available' ? '✓ 可用' : c.status === 'locked' ? '⏳ 锁定' : '✗ 已售'}</span>
+                                            ${c.remark ? `<span class="ldsp-shop-cdk-mgr-remark" title="${Utils.escapeHtml(c.remark)}">${Utils.escapeHtml(c.remark)}</span>` : ''}
                                         </div>
-                                        ${c.status === 'available' ? `<button class="ldsp-cdk-item-delete" data-id="${c.id}" title="删除此CDK">×</button>` : '<div style="width:24px"></div>'}
+                                        ${c.status === 'available' ? `<button class="ldsp-shop-cdk-mgr-delete" data-id="${c.id}" title="删除此CDK">×</button>` : '<div style="width:24px"></div>'}
                                     </div>
                                 `).join('')}
                             </div>
                             ${pagination.totalPages > 1 ? `
-                            <div class="ldsp-cdk-pagination">
+                            <div class="ldsp-shop-cdk-mgr-pagination">
                                 <span>第 ${pagination.page} / ${pagination.totalPages} 页</span>
-                                <div class="ldsp-cdk-pagination-btns">
-                                    <button class="ldsp-cdk-page-btn" data-page="${pagination.page - 1}" ${pagination.page <= 1 ? 'disabled' : ''}>上一页</button>
-                                    <button class="ldsp-cdk-page-btn" data-page="${pagination.page + 1}" ${pagination.page >= pagination.totalPages ? 'disabled' : ''}>下一页</button>
+                                <div class="ldsp-shop-cdk-mgr-pagination-btns">
+                                    <button class="ldsp-shop-cdk-mgr-page-btn" data-page="${pagination.page - 1}" ${pagination.page <= 1 ? 'disabled' : ''}>上一页</button>
+                                    <button class="ldsp-shop-cdk-mgr-page-btn" data-page="${pagination.page + 1}" ${pagination.page >= pagination.totalPages ? 'disabled' : ''}>下一页</button>
                                 </div>
                             </div>
                             ` : ''}
                             ` : `
-                            <div class="ldsp-cdk-empty">
-                                <div class="ldsp-cdk-empty-icon">📦</div>
-                                <div class="ldsp-cdk-empty-text">暂无 CDK</div>
-                                <div class="ldsp-cdk-empty-hint">在上方输入框中添加 CDK</div>
+                            <div class="ldsp-shop-cdk-mgr-empty">
+                                <div class="ldsp-shop-cdk-mgr-empty-icon">📦</div>
+                                <div class="ldsp-shop-cdk-mgr-empty-text">暂无 CDK</div>
+                                <div class="ldsp-shop-cdk-mgr-empty-hint">在上方输入框中添加 CDK</div>
                             </div>
                             `}
                         </div>
@@ -8735,7 +8735,7 @@
                 });
                 
                 // 分页
-                body.querySelectorAll('.ldsp-cdk-page-btn').forEach(btn => {
+                body.querySelectorAll('.ldsp-shop-cdk-mgr-page-btn').forEach(btn => {
                     btn.addEventListener('click', async () => {
                         const page = parseInt(btn.dataset.page);
                         if (page && !btn.disabled) {
@@ -8746,7 +8746,7 @@
                 });
                 
                 // 删除单个 CDK
-                body.querySelectorAll('.ldsp-cdk-item-delete').forEach(btn => {
+                body.querySelectorAll('.ldsp-shop-cdk-mgr-delete').forEach(btn => {
                     btn.addEventListener('click', async (e) => {
                         e.stopPropagation();
                         const cdkId = parseInt(btn.dataset.id);
