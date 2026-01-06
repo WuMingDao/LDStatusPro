@@ -8447,7 +8447,7 @@
                             <div class="ldsp-merchant-form-actions">
                                 ${isConfigured ? `
                                 <button class="ldsp-merchant-edit-btn" id="merchant-edit-btn">✏️ 编辑配置</button>
-                                <button class="ldsp-merchant-test-btn" id="merchant-test-btn">🔔 测试回调</button>
+                                <button class="ldsp-merchant-test-btn" id="merchant-test-btn">🔔 测试通知</button>
                                 <button class="ldsp-merchant-save-btn" id="merchant-save-btn" style="display:none">💾 保存配置</button>
                                 <button class="ldsp-merchant-cancel-btn" id="merchant-cancel-btn" style="display:none">取消</button>
                                 <button class="ldsp-merchant-delete-btn">🗑️ 删除配置</button>
@@ -8462,13 +8462,13 @@
                             <div class="ldsp-merchant-help-content">
                                 <p>1. 访问 <a href="https://credit.linux.do/merchant" target="_blank" rel="noopener">LDC 集市</a></p>
                                 <p>2. 创建新应用，配置以下地址：</p>
-                                <p style="margin-top:6px">⚠️ <b>通知地址</b>：</p>
+                                <p style="margin-top:6px">⚠️ <b>通知地址</b>（notify_url，服务器异步通知，必填）：</p>
                                 <p style="margin-left:12px;font-family:monospace;font-size:11px;color:#3b82f6;word-break:break-all">https://api.ldspro.qzz.io/api/shop/ldc/notify</p>
-                                <p style="margin-top:6px">⚠️ <b>回调地址</b>（支付后用户跳转）：</p>
+                                <p style="margin-top:6px">⚠️ <b>回调地址</b>（return_url，支付后浏览器跳转）：</p>
                                 <p style="margin-left:12px;font-family:monospace;font-size:11px;color:#3b82f6;word-break:break-all">https://api.ldspro.qzz.io/api/shop/ldc/return</p>
                                 <p style="margin-top:8px">3. 在应用详情页获取 Client ID 和 Client Key</p>
                                 <p>4. 填写到上方配置表单并保存</p>
-                                <p style="margin-top:8px;font-size:11px;color:#94a3b8">💡 提示：回调地址用于支付完成后确认订单状态，请务必正确配置</p>
+                                <p style="margin-top:8px;font-size:11px;color:#94a3b8">💡 提示：通知地址是支付成功后自动发货的关键，请务必正确配置</p>
                             </div>
                         </div>
                     </div>
@@ -8547,7 +8547,7 @@
                         // 检查是否有回调警告
                         const data = resp?.data || resp;
                         if (data.callbackWarning) {
-                            LDSPDialog.warning(`配置已保存，但回调验证有警告：<br><br>${Utils.escapeHtml(data.callbackWarning)}<br><br>请确保 LDC 后台的回调地址设置为：<br><code style="font-size:11px;background:#333;padding:2px 6px;border-radius:3px">${Utils.escapeHtml(data.expectedNotifyUrl)}</code>`);
+                            LDSPDialog.warning(`配置已保存，但通知地址验证有警告：<br><br>${Utils.escapeHtml(data.callbackWarning)}<br><br>请确保 LDC 后台的通知地址设置为：<br><code style="font-size:11px;background:#333;padding:2px 6px;border-radius:3px">${Utils.escapeHtml(data.expectedNotifyUrl)}</code>`);
                         } else {
                             LDSPDialog.success('配置保存成功');
                         }
@@ -8559,7 +8559,7 @@
                     }
                 });
                 
-                // 测试回调按钮
+                // 测试通知按钮
                 body.querySelector('#merchant-test-btn')?.addEventListener('click', async () => {
                     const btn = body.querySelector('#merchant-test-btn');
                     btn.disabled = true;
@@ -8567,15 +8567,15 @@
                     
                     const resp = await this._testMerchantCallback();
                     btn.disabled = false;
-                    btn.textContent = '🔔 测试回调';
+                    btn.textContent = '🔔 测试通知';
                     
                     if (resp?.success) {
                         const data = resp?.data || resp;
                         const testData = data.data || data;
                         if (testData.status === 'ok') {
-                            LDSPDialog.success(`✅ 回调测试成功！<br><br>您的回调配置正确，回调地址：<br><code style="font-size:11px;background:#333;padding:2px 6px;border-radius:3px">${Utils.escapeHtml(testData.notifyUrl)}</code>`);
+                            LDSPDialog.success(`✅ 通知测试成功！<br><br>您的通知地址配置正确：<br><code style="font-size:11px;background:#333;padding:2px 6px;border-radius:3px">${Utils.escapeHtml(testData.notifyUrl)}</code>`);
                         } else {
-                            LDSPDialog.warning(`⚠️ ${Utils.escapeHtml(data.message || '回调测试完成')}<br><br>请确保 LDC 后台的回调地址设置正确：<br><code style="font-size:11px;background:#333;padding:2px 6px;border-radius:3px">${Utils.escapeHtml(testData.notifyUrl)}</code>${testData.hint ? '<br><br>💡 ' + Utils.escapeHtml(testData.hint) : ''}`);
+                            LDSPDialog.warning(`⚠️ ${Utils.escapeHtml(data.message || '通知测试完成')}<br><br>请确保 LDC 后台的通知地址设置正确：<br><code style="font-size:11px;background:#333;padding:2px 6px;border-radius:3px">${Utils.escapeHtml(testData.notifyUrl)}</code>${testData.hint ? '<br><br>💡 ' + Utils.escapeHtml(testData.hint) : ''}`);
                         }
                     } else {
                         LDSPDialog.error(this._formatError(resp));
