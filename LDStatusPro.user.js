@@ -1,7 +1,7 @@
  // ==UserScript==
     // @name         LDStatus Pro
     // @namespace    http://tampermonkey.net/
-    // @version      3.5.4.3
+    // @version      3.5.4.5
     // @description  在 Linux.do 和 IDCFlare 页面显示信任级别进度，支持历史趋势、里程碑通知、阅读时间统计、排行榜系统、我的活动查看。两站点均支持排行榜和云同步功能
     // @author       JackLiii
     // @license      MIT
@@ -4368,6 +4368,8 @@
     .ldsp-shop-card-time{font-size:8px;color:var(--txt-mut);margin-left:auto}
     .ldsp-shop-card-seller{font-size:9px;color:var(--txt-sec);display:flex;align-items:center;gap:3px;overflow:hidden}
     .ldsp-shop-card-seller-avatar{width:14px;height:14px;border-radius:50%;background:var(--bg-el);flex-shrink:0;object-fit:cover}
+    .ldsp-shop-card-seller-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .ldsp-shop-card-sold{margin-left:auto;font-size:8px;color:#f97316;font-weight:600;flex-shrink:0}
     .ldsp-shop-card-footer{display:flex;justify-content:space-between;align-items:center;padding-top:6px;border-top:1px solid var(--border)}
     .ldsp-shop-card-price{font-size:13px;font-weight:700;color:var(--accent);display:flex;align-items:baseline;gap:1px}
     .ldsp-shop-card-price span{font-size:8px;font-weight:500;color:var(--txt-mut)}
@@ -4674,6 +4676,10 @@
     .ldsp-shop-cdk-mgr-status.locked{background:rgba(234,179,8,.2);color:#eab308}
     .ldsp-shop-cdk-mgr-status.sold{background:rgba(107,114,128,.2);color:#6b7280}
     .ldsp-shop-cdk-mgr-remark{font-size:9px;color:var(--txt-mut);max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .ldsp-shop-cdk-mgr-actions{display:flex;gap:4px;flex-shrink:0}
+    .ldsp-shop-cdk-mgr-copy{width:24px;height:24px;display:flex;align-items:center;justify-content:center;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--bg-card);font-size:12px;cursor:pointer;transition:all .15s;flex-shrink:0}
+    .ldsp-shop-cdk-mgr-copy:hover{border-color:var(--accent);background:rgba(107,140,239,.1)}
+    .ldsp-shop-cdk-mgr-copy.copied{border-color:#22c55e;background:rgba(34,197,94,.15)}
     .ldsp-shop-cdk-mgr-delete{width:24px;height:24px;display:flex;align-items:center;justify-content:center;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--bg-card);font-size:14px;color:var(--txt-mut);cursor:pointer;transition:all .15s;flex-shrink:0}
     .ldsp-shop-cdk-mgr-delete:hover{color:#fff;background:var(--err);border-color:var(--err)}
     .ldsp-shop-cdk-mgr-pagination{display:flex;justify-content:space-between;align-items:center;padding-top:10px;border-top:1px dashed var(--border);font-size:10px;color:var(--txt-mut);flex-shrink:0}
@@ -7408,11 +7414,12 @@
                         </div>
                         <div class="ldsp-shop-card-seller">
                             <img class="ldsp-shop-card-seller-avatar" src="${sellerAvatar}" alt="" onerror="this.style.display='none'">
-                            ${Utils.escapeHtml(p.seller_username || '匿名')}
+                            <span class="ldsp-shop-card-seller-name">${Utils.escapeHtml(p.seller_username || '匿名')}</span>
+                            ${isCdk && soldCount > 0 ? `<span class="ldsp-shop-card-sold">🔥${soldCount}</span>` : ''}
                         </div>
                         <div class="ldsp-shop-card-footer">
                             <div class="ldsp-shop-card-price${hasDiscount ? ' discounted' : ''}">${finalPrice}<span>LDC</span>${hasDiscount ? `<span class="ldsp-shop-card-original">${price.toFixed(2)}</span>` : ''}</div>
-                            <div class="ldsp-shop-card-views">${isCdk && soldCount > 0 ? `🔥${soldCount}` : `👁${p.view_count || 0}`}</div>
+                            <div class="ldsp-shop-card-views">👁${p.view_count || 0}</div>
                         </div>
                     </div>
                 </div>`;
@@ -8747,7 +8754,10 @@
                                             <span class="ldsp-shop-cdk-mgr-status ${c.status}">${c.status === 'available' ? '✓ 可用' : c.status === 'locked' ? '⏳ 锁定' : '✗ 已售'}</span>
                                             ${c.remark ? `<span class="ldsp-shop-cdk-mgr-remark" title="${Utils.escapeHtml(c.remark)}">${Utils.escapeHtml(c.remark)}</span>` : ''}
                                         </div>
-                                        ${c.status === 'available' ? `<button class="ldsp-shop-cdk-mgr-delete" data-id="${c.id}" title="删除此CDK">×</button>` : '<div style="width:24px"></div>'}
+                                        <div class="ldsp-shop-cdk-mgr-actions">
+                                            <button class="ldsp-shop-cdk-mgr-copy" data-code="${Utils.escapeHtml(c.code)}" title="复制CDK">📋</button>
+                                            ${c.status === 'available' ? `<button class="ldsp-shop-cdk-mgr-delete" data-id="${c.id}" title="删除此CDK">×</button>` : ''}
+                                        </div>
                                     </div>
                                 `).join('')}
                             </div>
@@ -8823,6 +8833,51 @@
                         if (page && !btn.disabled) {
                             this._cdkState.page = page;
                             this._renderCdkManager(productId);
+                        }
+                    });
+                });
+                
+                // 复制单个 CDK
+                body.querySelectorAll('.ldsp-shop-cdk-mgr-copy').forEach(btn => {
+                    btn.addEventListener('click', async (e) => {
+                        e.stopPropagation();
+                        const code = btn.dataset.code;
+                        if (!code) return;
+                        
+                        const doCopy = () => {
+                            btn.classList.add('copied');
+                            btn.textContent = '✓';
+                            setTimeout(() => {
+                                btn.classList.remove('copied');
+                                btn.textContent = '📋';
+                            }, 1500);
+                        };
+                        
+                        if (navigator.clipboard?.writeText) {
+                            try {
+                                await navigator.clipboard.writeText(code);
+                                doCopy();
+                            } catch {
+                                // 降级方案
+                                const textarea = document.createElement('textarea');
+                                textarea.value = code;
+                                textarea.style.cssText = 'position:fixed;left:-9999px';
+                                document.body.appendChild(textarea);
+                                textarea.select();
+                                document.execCommand('copy');
+                                document.body.removeChild(textarea);
+                                doCopy();
+                            }
+                        } else {
+                            // 降级方案
+                            const textarea = document.createElement('textarea');
+                            textarea.value = code;
+                            textarea.style.cssText = 'position:fixed;left:-9999px';
+                            document.body.appendChild(textarea);
+                            textarea.select();
+                            document.execCommand('copy');
+                            document.body.removeChild(textarea);
+                            doCopy();
                         }
                     });
                 });
