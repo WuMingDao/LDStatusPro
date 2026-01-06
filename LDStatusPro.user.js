@@ -8436,7 +8436,8 @@
                             <div class="ldsp-merchant-help-content">
                                 <p>1. 访问 <a href="https://credit.linux.do/merchant" target="_blank" rel="noopener">LDC 集市</a></p>
                                 <p>2. 创建新应用</p>
-                                <p>3. ⚠️回调地址填写：https://api.ldspro.qzz.io/api/shop/ldc/notify</p>
+                                <p>3. ⚠️<b>回调地址</b>（不是通知地址）填写：</p>
+                                <p style="margin-left:12px;font-family:monospace;font-size:11px;color:#3b82f6">https://api.ldspro.qzz.io/api/shop/ldc/notify</p>
                                 <p>4. 在应用详情页获取 Client ID 和 Client Key</p>
                                 <p>5. 填写到上方配置表单并保存</p>
                             </div>
