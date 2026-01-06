@@ -4617,6 +4617,9 @@
     .ldsp-merchant-form-actions{display:flex;gap:10px;flex-wrap:wrap}
     .ldsp-merchant-edit-btn{flex:1;padding:10px 16px;border:1px solid var(--accent);border-radius:var(--r-md);font-size:12px;font-weight:600;background:transparent;color:var(--accent);cursor:pointer;transition:all .15s}
     .ldsp-merchant-edit-btn:hover{background:var(--accent);color:#fff}
+    .ldsp-merchant-test-btn{padding:10px 16px;border:1px solid #f59e0b;border-radius:var(--r-md);font-size:12px;font-weight:600;background:transparent;color:#f59e0b;cursor:pointer;transition:all .15s}
+    .ldsp-merchant-test-btn:hover{background:#f59e0b;color:#fff}
+    .ldsp-merchant-test-btn:disabled{opacity:.6;cursor:not-allowed}
     .ldsp-merchant-save-btn{flex:1;padding:10px 16px;border:none;border-radius:var(--r-md);font-size:12px;font-weight:600;background:var(--accent);color:#fff;cursor:pointer;transition:all .15s}
     .ldsp-merchant-save-btn:hover{filter:brightness(1.1)}
     .ldsp-merchant-save-btn:disabled{opacity:.6;cursor:not-allowed}
@@ -8345,6 +8348,23 @@
                 });
             }
 
+            // 测试 LDC 回调配置
+            async _testMerchantCallback() {
+                return new Promise(resolve => {
+                    GM_xmlhttpRequest({
+                        method: 'POST',
+                        url: `${this._apiUrl}/api/shop/merchant/test-callback`,
+                        headers: { 'Authorization': `Bearer ${this._token}` },
+                        onload: r => {
+                            try { resolve(JSON.parse(r.responseText)); }
+                            catch { resolve({ success: false, error: '解析响应失败' }); }
+                        },
+                        onerror: () => resolve({ success: false, error: '网络错误' }),
+                        ontimeout: () => resolve({ success: false, error: '请求超时' })
+                    });
+                });
+            }
+
             // 渲染商户收款设置页面
             async _renderMerchantSettings() {
                 const body = this.overlay.querySelector('.ldsp-ldc-body');
@@ -8427,6 +8447,7 @@
                             <div class="ldsp-merchant-form-actions">
                                 ${isConfigured ? `
                                 <button class="ldsp-merchant-edit-btn" id="merchant-edit-btn">✏️ 编辑配置</button>
+                                <button class="ldsp-merchant-test-btn" id="merchant-test-btn">🔔 测试回调</button>
                                 <button class="ldsp-merchant-save-btn" id="merchant-save-btn" style="display:none">💾 保存配置</button>
                                 <button class="ldsp-merchant-cancel-btn" id="merchant-cancel-btn" style="display:none">取消</button>
                                 <button class="ldsp-merchant-delete-btn">🗑️ 删除配置</button>
@@ -8440,11 +8461,14 @@
                             <div class="ldsp-merchant-help-title">❓ 如何获取 LDC 收款凭证</div>
                             <div class="ldsp-merchant-help-content">
                                 <p>1. 访问 <a href="https://credit.linux.do/merchant" target="_blank" rel="noopener">LDC 集市</a></p>
-                                <p>2. 创建新应用</p>
-                                <p>3. ⚠️<b>回调地址</b>（不是通知地址）填写：</p>
-                                <p style="margin-left:12px;font-family:monospace;font-size:11px;color:#3b82f6">https://api.ldspro.qzz.io/api/shop/ldc/notify</p>
-                                <p>4. 在应用详情页获取 Client ID 和 Client Key</p>
-                                <p>5. 填写到上方配置表单并保存</p>
+                                <p>2. 创建新应用，配置以下地址：</p>
+                                <p style="margin-top:6px">⚠️ <b>通知地址</b>：</p>
+                                <p style="margin-left:12px;font-family:monospace;font-size:11px;color:#3b82f6;word-break:break-all">https://api.ldspro.qzz.io/api/shop/ldc/notify</p>
+                                <p style="margin-top:6px">⚠️ <b>回调地址</b>（支付后用户跳转）：</p>
+                                <p style="margin-left:12px;font-family:monospace;font-size:11px;color:#3b82f6;word-break:break-all">https://api.ldspro.qzz.io/api/shop/ldc/return</p>
+                                <p style="margin-top:8px">3. 在应用详情页获取 Client ID 和 Client Key</p>
+                                <p>4. 填写到上方配置表单并保存</p>
+                                <p style="margin-top:8px;font-size:11px;color:#94a3b8">💡 提示：回调地址用于支付完成后确认订单状态，请务必正确配置</p>
                             </div>
                         </div>
                     </div>
@@ -8520,7 +8544,13 @@
                     
                     const resp = await this._saveMerchantConfig(pid, key);
                     if (resp?.success) {
-                        LDSPDialog.success('配置保存成功');
+                        // 检查是否有回调警告
+                        const data = resp?.data || resp;
+                        if (data.callbackWarning) {
+                            LDSPDialog.warning(`配置已保存，但回调验证有警告：<br><br>${Utils.escapeHtml(data.callbackWarning)}<br><br>请确保 LDC 后台的回调地址设置为：<br><code style="font-size:11px;background:#333;padding:2px 6px;border-radius:3px">${Utils.escapeHtml(data.expectedNotifyUrl)}</code>`);
+                        } else {
+                            LDSPDialog.success('配置保存成功');
+                        }
                         this._renderMerchantSettings();
                     } else {
                         btn.disabled = false;
@@ -8529,6 +8559,29 @@
                     }
                 });
                 
+                // 测试回调按钮
+                body.querySelector('#merchant-test-btn')?.addEventListener('click', async () => {
+                    const btn = body.querySelector('#merchant-test-btn');
+                    btn.disabled = true;
+                    btn.textContent = '测试中...';
+                    
+                    const resp = await this._testMerchantCallback();
+                    btn.disabled = false;
+                    btn.textContent = '🔔 测试回调';
+                    
+                    if (resp?.success) {
+                        const data = resp?.data || resp;
+                        const testData = data.data || data;
+                        if (testData.status === 'ok') {
+                            LDSPDialog.success(`✅ 回调测试成功！<br><br>您的回调配置正确，回调地址：<br><code style="font-size:11px;background:#333;padding:2px 6px;border-radius:3px">${Utils.escapeHtml(testData.notifyUrl)}</code>`);
+                        } else {
+                            LDSPDialog.warning(`⚠️ ${Utils.escapeHtml(data.message || '回调测试完成')}<br><br>请确保 LDC 后台的回调地址设置正确：<br><code style="font-size:11px;background:#333;padding:2px 6px;border-radius:3px">${Utils.escapeHtml(testData.notifyUrl)}</code>${testData.hint ? '<br><br>💡 ' + Utils.escapeHtml(testData.hint) : ''}`);
+                        }
+                    } else {
+                        LDSPDialog.error(this._formatError(resp));
+                    }
+                });
+
                 // 删除配置
                 body.querySelector('.ldsp-merchant-delete-btn')?.addEventListener('click', async () => {
                     const confirmed = await LDSPDialog.confirm('确定要删除收款配置吗？<br><br>删除后您的 CDK 物品将无法进行平台内支付。', { title: '删除配置', icon: '⚠️', danger: true });
