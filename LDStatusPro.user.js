@@ -1,7 +1,7 @@
  // ==UserScript==
     // @name         LDStatus Pro
     // @namespace    http://tampermonkey.net/
-    // @version      3.5.4.5
+    // @version      3.5.4.6
     // @description  在 Linux.do 和 IDCFlare 页面显示信任级别进度，支持历史趋势、里程碑通知、阅读时间统计、排行榜系统、我的活动查看。两站点均支持排行榜和云同步功能
     // @author       JackLiii
     // @license      MIT
@@ -4715,6 +4715,8 @@
     .ldsp-shop-my-card-status{position:absolute;top:8px;right:8px;padding:2px 6px;font-size:9px;font-weight:600;border-radius:4px}
     .ldsp-shop-my-card-status.active{background:rgba(34,197,94,.15);color:#22c55e}
     .ldsp-shop-my-card-status.inactive{background:rgba(239,68,68,.15);color:#ef4444}
+    .ldsp-shop-my-card-status.rejected{background:rgba(239,68,68,.2);color:#dc2626}
+    .ldsp-shop-my-card-reason{font-size:9px;color:#dc2626;background:rgba(239,68,68,.08);padding:4px 6px;border-radius:4px;border-left:2px solid #ef4444;margin-bottom:4px;line-height:1.4;word-break:break-all}
     .ldsp-shop-my-list{display:flex;flex-direction:column;gap:8px;overflow-y:auto;flex:1;min-height:0}
     /* LDC/工单/吃瓜/CDK 响应式适配 */
     @media (max-width:380px){.ldsp-ldc-header,.ldsp-ticket-header,.ldsp-melon-header,.ldsp-cdk-header{padding:8px 10px}.ldsp-ldc-title,.ldsp-ticket-title,.ldsp-melon-title,.ldsp-cdk-title{font-size:12px}.ldsp-ldc-tabs{}.ldsp-ldc-tab,.ldsp-cdk-tab{padding:8px 6px;font-size:10px}.ldsp-ldc-body,.ldsp-ticket-body,.ldsp-melon-body,.ldsp-cdk-body{padding:10px;gap:8px}.ldsp-ldc-balance-card{padding:12px}.ldsp-ldc-balance-main{gap:8px}.ldsp-ldc-balance-value{font-size:24px}.ldsp-ldc-balance-right{gap:3px}.ldsp-ldc-balance-sub,.ldsp-ldc-balance-estimate{font-size:9px}.ldsp-ldc-stats-grid{grid-template-columns:1fr}.ldsp-ldc-stat-card{padding:10px;gap:8px}.ldsp-ldc-stat-icon{font-size:16px}.ldsp-ldc-stat-num{font-size:13px}.ldsp-ldc-chart-bars{height:60px}.ldsp-ldc-filter-section{gap:6px;padding-bottom:8px}.ldsp-ldc-filter-label{font-size:9px;min-width:24px}.ldsp-ldc-filter-chip{padding:4px 8px;font-size:9px}.ldsp-ldc-trans-item{padding:8px}.ldsp-ldc-trans-icon{font-size:14px;width:22px;height:22px}.ldsp-ldc-trans-name{font-size:11px}.ldsp-ldc-trans-amount{font-size:13px}.ldsp-ticket-tabs{padding:0 8px}.ldsp-ticket-tab,.ldsp-melon-tab{padding:6px 10px;font-size:9px}.ldsp-ldc-support{gap:12px}.ldsp-ldc-support-header{padding:10px 8px}.ldsp-ldc-support-title{font-size:13px}.ldsp-ldc-support-grid{gap:8px}.ldsp-ldc-support-card{padding:14px 10px}.ldsp-ldc-support-icon{font-size:28px;margin-bottom:8px}.ldsp-ldc-support-amount{font-size:16px}.ldsp-github-star-card{gap:10px;padding:10px 12px}.ldsp-github-icon-wrap{width:30px;height:30px}.ldsp-github-icon{width:26px;height:26px}.ldsp-github-title{font-size:11px;gap:4px}.ldsp-github-star-icon{font-size:14px}.ldsp-github-desc{font-size:9px}.ldsp-github-arrow{font-size:14px}.ldsp-cdk-user-card{flex-wrap:wrap;gap:10px;padding:12px}.ldsp-cdk-user-card::before{display:none}.ldsp-cdk-user-avatar{width:40px;height:40px}.ldsp-cdk-user-info{flex:1;min-width:80px;display:flex;flex-direction:column;align-items:flex-start}.ldsp-cdk-user-name{font-size:13px}.ldsp-cdk-user-username{font-size:9px}.ldsp-cdk-user-level{font-size:9px;padding:2px 8px;margin-top:4px}.ldsp-cdk-score-card{min-width:70px;padding:10px}.ldsp-cdk-score-label{font-size:8px}.ldsp-cdk-score-value{font-size:20px}.ldsp-cdk-qty-card{flex-direction:column;padding:10px;gap:8px}.ldsp-cdk-qty-item{padding:8px}.ldsp-cdk-qty-item.remain{border-right:none;border-bottom:1px solid var(--border)}.ldsp-cdk-qty-item .num{font-size:20px}.ldsp-cdk-qty-divider{display:none}.ldsp-cdk-item{padding:10px}.ldsp-cdk-item-name{font-size:12px}.ldsp-cdk-item-content{padding:6px 8px;font-size:10px}}
@@ -7261,11 +7263,14 @@
                     const statusMap = {
                         'approved': { text: '在售', class: 'active' },
                         'pending': { text: '待审核', class: 'inactive' },
-                        'rejected': { text: '已拒绝', class: 'inactive' },
+                        'rejected': { text: '已拒绝', class: 'inactive rejected' },
                         'offline': { text: '已下架', class: 'inactive' }
                     };
                     const statusInfo = statusMap[status] || statusMap['pending'];
                     const myCardBgColor = this._getRandomLightColor(p.id);
+                    // 获取拒绝/下架原因
+                    const statusReason = p.status_reason || p.reject_reason;
+                    const isAdminAction = p.status_action === 'admin_offline' || p.status_admin;
                     // v2.0: 商品类型和库存（优先使用 availableStock 或 cdkStats.available）
                     const productType = p.product_type || 'link';
                     const isCdk = productType === 'cdk';
@@ -7281,6 +7286,7 @@
                         `<div class="ldsp-shop-my-card-img-placeholder" style="background:${myCardBgColor}">${catIcon}</div>`}
                         <div class="ldsp-shop-my-card-info">
                             <div class="ldsp-shop-my-card-name">${Utils.escapeHtml(p.name)}</div>
+                            ${(status === 'rejected' || status === 'offline') && statusReason ? `<div class="ldsp-shop-my-card-reason">${isAdminAction ? '⚠️ 管理员下架: ' : (status === 'rejected' ? '❌ 拒绝原因: ' : '📝 原因: ')}${Utils.escapeHtml(statusReason)}</div>` : ''}
                             <div class="ldsp-shop-my-card-meta">
                                 <span>${catIcon} ${Utils.escapeHtml(catName)}</span>
                                 ${isCdk ? `<span class="ldsp-shop-my-card-stock${isOutOfStock ? ' low' : isLowStock ? ' low' : ''}"><span class="available">${stock === -1 ? '∞' : availableStock}</span><span class="divider">/</span><span class="total">${p.cdkStats?.total || stock || 0}</span></span>` : ''}
@@ -7828,6 +7834,8 @@
                 const stock = parseInt(product.stock) || 0;
                 const soldCount = parseInt(product.sold_count) || 0;
                 const availableStock = product.availableStock !== undefined ? product.availableStock : stock;
+                // 总库存应使用实际 CDK 数量（cdkStats.total），而不是初始库存值
+                const totalStock = product.cdkStats?.total || stock;
                 const canPurchase = product.canPurchase !== false;
                 const isOutOfStock = isCdk && stock !== -1 && availableStock <= 0;
                 
@@ -7877,7 +7885,7 @@
                         </div>
                         <div class="ldsp-shop-detail-info">
                             <span class="ldsp-shop-detail-info-item">👁 ${product.view_count || 0}</span>
-                            ${isCdk ? `<span class="ldsp-shop-detail-info-item stock${isOutOfStock ? ' low' : ''}">📦 <span class="available">${stock === -1 ? '∞' : availableStock}</span>/<span class="total">${stock === -1 ? '∞' : (product.stock || 0)}</span></span>` : ''}
+                            ${isCdk ? `<span class="ldsp-shop-detail-info-item stock${isOutOfStock ? ' low' : ''}">📦 <span class="available">${stock === -1 ? '∞' : availableStock}</span>/<span class="total">${stock === -1 ? '∞' : totalStock}</span></span>` : ''}
                             ${isCdk && soldCount > 0 ? `<span class="ldsp-shop-detail-info-item sold">🔥 已售${soldCount}</span>` : ''}
                             <span class="ldsp-shop-detail-info-item">📅 ${this._formatRelativeTime(product.updated_at || product.created_at)}</span>
                         </div>
