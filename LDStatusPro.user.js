@@ -4514,9 +4514,9 @@
     .ldsp-order-actions{display:flex;gap:6px}
     .ldsp-order-back-btn{padding:6px 12px;border:1px solid var(--border);border-radius:var(--r-sm);font-size:11px;color:var(--txt-sec);background:var(--bg-el);cursor:pointer;transition:all .15s}
     .ldsp-order-back-btn:hover{border-color:var(--accent);color:var(--accent)}
-    .ldsp-order-detail-status{padding:12px 16px;border-radius:var(--r-md);border:1px solid;text-align:center;font-size:14px;font-weight:600}
-    .ldsp-order-detail-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden}
-    .ldsp-order-logs{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-md);padding:14px;display:flex;flex-direction:column;gap:10px}
+    .ldsp-order-detail-status{padding:10px 14px;border-radius:var(--r-md);border:1px solid;text-align:center;font-size:13px;font-weight:600}
+    .ldsp-order-detail-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-md);padding:12px 14px}
+    .ldsp-order-logs{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-md);padding:12px;display:flex;flex-direction:column;gap:8px;max-height:150px;overflow-y:auto}
     .ldsp-order-logs-title{font-size:11px;font-weight:600;color:var(--txt-sec);padding-bottom:8px;border-bottom:1px dashed var(--border)}
     .ldsp-order-log-item{display:flex;justify-content:space-between;font-size:10px;color:var(--txt-mut)}
     .ldsp-order-log-action{color:var(--txt)}
@@ -4526,8 +4526,8 @@
     .ldsp-order-empty-icon{font-size:40px;opacity:.5}
     .ldsp-order-empty-text{font-size:12px}
     /* Shop v2.0 订单详情页 */
-    .ldsp-order-detail{display:flex;flex-direction:column;gap:12px;padding:2px}
-    .ldsp-order-detail-header{display:flex;justify-content:space-between;align-items:center}
+    .ldsp-order-detail{display:flex;flex-direction:column;gap:10px;padding:0}
+    .ldsp-order-detail-header{display:flex;justify-content:space-between;align-items:center;padding-bottom:4px}
     .ldsp-order-detail-id{font-size:12px;color:var(--txt-mut);font-family:monospace}
     .ldsp-order-detail-section{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-md);padding:14px;display:flex;flex-direction:column;gap:10px}
     .ldsp-order-detail-section-title{font-size:11px;font-weight:600;color:var(--txt-sec);padding-bottom:8px;border-bottom:1px dashed var(--border);display:flex;align-items:center;gap:6px}
@@ -4537,14 +4537,16 @@
     .ldsp-order-detail-product-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
     .ldsp-order-detail-product-name{font-size:14px;font-weight:600;color:var(--txt)}
     .ldsp-order-detail-product-seller{font-size:11px;color:var(--txt-mut)}
-    .ldsp-order-detail-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0}
-    .ldsp-order-detail-row .label{font-size:11px;color:var(--txt-mut)}
-    .ldsp-order-detail-row .value{font-size:11px;color:var(--txt);font-weight:500}
-    .ldsp-order-detail-row .value.price{font-size:15px;font-weight:700;color:var(--accent)}
+    .ldsp-order-detail-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;gap:10px;border-bottom:1px dashed var(--border)}
+    .ldsp-order-detail-row:last-child{border-bottom:none}
+    .ldsp-order-detail-row .label{font-size:11px;color:var(--txt-mut);white-space:nowrap;flex-shrink:0}
+    .ldsp-order-detail-row .value{font-size:11px;color:var(--txt);font-weight:500;text-align:right;word-break:break-all;min-width:0}
+    .ldsp-order-detail-row .value.mono{font-family:monospace;font-size:10px}
+    .ldsp-order-detail-row .value.price{font-size:14px;font-weight:700;color:var(--accent)}
     .ldsp-order-detail-row .value.status{padding:3px 8px;font-size:10px;font-weight:600;border-radius:4px}
-    .ldsp-order-cdk-section{background:linear-gradient(135deg,rgba(234,179,8,.08),rgba(234,179,8,.02));border:1px solid rgba(234,179,8,.2);border-radius:var(--r-md);padding:14px}
-    .ldsp-order-cdk-title{font-size:11px;font-weight:600;color:#eab308;margin-bottom:10px;display:flex;align-items:center;gap:6px}
-    .ldsp-order-cdk-content{background:var(--bg-el);border:1px solid var(--border);border-radius:var(--r-sm);padding:12px;position:relative}
+    .ldsp-order-cdk-section{background:linear-gradient(135deg,rgba(234,179,8,.08),rgba(234,179,8,.02));border:1px solid rgba(234,179,8,.2);border-radius:var(--r-md);padding:12px}
+    .ldsp-order-cdk-title{font-size:11px;font-weight:600;color:#eab308;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+    .ldsp-order-cdk-content{background:var(--bg-el);border:1px solid var(--border);border-radius:var(--r-sm);padding:10px;position:relative;font-size:12px;font-family:monospace;word-break:break-all;white-space:pre-wrap;line-height:1.5;max-height:120px;overflow-y:auto}
     .ldsp-order-cdk-value{font-size:13px;font-family:monospace;color:var(--txt);word-break:break-all;padding-right:36px;white-space:pre-wrap;line-height:1.5}
     .ldsp-order-cdk-copy{position:absolute;top:8px;right:8px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;background:var(--bg-el);border:1px solid var(--border);border-radius:var(--r-sm);cursor:pointer;font-size:12px;transition:all .15s}
     .ldsp-order-cdk-copy:hover{border-color:var(--accent);color:var(--accent)}
@@ -8817,31 +8819,32 @@
                     <div class="ldsp-order-detail">
                         <div class="ldsp-order-detail-header">
                             <button class="ldsp-order-back-btn">← 返回</button>
-                            <span>订单详情</span>
+                            <span style="font-size:13px;font-weight:600">订单详情</span>
                         </div>
-                        <div class="ldsp-order-detail-status" style="background:${status.color}20;border-color:${status.color}">
+                        <div class="ldsp-order-detail-status" style="background:${status.color}15;border-color:${status.color}">
                             <span style="color:${status.color}">${status.text}</span>
                         </div>
                         <div class="ldsp-order-detail-card">
                             <div class="ldsp-order-detail-row"><span class="label">订单号</span><span class="value mono">${order.order_no}</span></div>
-                            <div class="ldsp-order-detail-row"><span class="label">物品名称</span><span class="value">${Utils.escapeHtml(product.name || '-')}</span></div>
+                            <div class="ldsp-order-detail-row"><span class="label">商品</span><span class="value">${Utils.escapeHtml(product.name || '-')}</span></div>
                             <div class="ldsp-order-detail-row"><span class="label">数量</span><span class="value">${order.quantity || 1}</span></div>
-                            <div class="ldsp-order-detail-row"><span class="label">实付金额</span><span class="value price">${parseFloat(order.amount).toFixed(2)} LDC</span></div>
+                            <div class="ldsp-order-detail-row"><span class="label">金额</span><span class="value price">${parseFloat(order.amount).toFixed(2)} LDC</span></div>
                             <div class="ldsp-order-detail-row"><span class="label">卖家</span><span class="value">${Utils.escapeHtml(order.seller_username)}</span></div>
                             <div class="ldsp-order-detail-row"><span class="label">买家</span><span class="value">${Utils.escapeHtml(order.buyer_username)}</span></div>
-                            <div class="ldsp-order-detail-row"><span class="label">创建时间</span><span class="value">${new Date(order.created_at).toLocaleString('zh-CN')}</span></div>
-                            ${order.paid_at ? `<div class="ldsp-order-detail-row"><span class="label">支付时间</span><span class="value">${new Date(order.paid_at).toLocaleString('zh-CN')}</span></div>` : ''}
-                            ${order.delivered_at ? `<div class="ldsp-order-detail-row"><span class="label">发货时间</span><span class="value">${new Date(order.delivered_at).toLocaleString('zh-CN')}</span></div>` : ''}
+                            <div class="ldsp-order-detail-row"><span class="label">下单</span><span class="value">${new Date(order.created_at).toLocaleString('zh-CN', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}</span></div>
+                            ${order.paid_at ? `<div class="ldsp-order-detail-row"><span class="label">支付</span><span class="value">${new Date(order.paid_at).toLocaleString('zh-CN', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}</span></div>` : ''}
+                            ${order.delivered_at ? `<div class="ldsp-order-detail-row"><span class="label">发货</span><span class="value">${new Date(order.delivered_at).toLocaleString('zh-CN', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}</span></div>` : ''}
                         </div>
                         ${order.status === 'pending' && role === 'buyer' ? `
-                            <div class="ldsp-order-pending-notice" style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:var(--r-md);padding:12px;margin-top:4px">
-                                <div style="font-size:11px;color:#f59e0b;font-weight:600;margin-bottom:8px">⏳ 等待支付</div>
-                                <div style="font-size:10px;color:var(--txt-sec);line-height:1.5;margin-bottom:10px">
-                                    如果您已完成支付但订单状态未更新，请点击"刷新状态"按钮手动查询支付结果。
+                            <div class="ldsp-order-pending-notice" style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:var(--r-md);padding:10px">
+                                <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+                                    <div style="font-size:10px;color:var(--txt-sec);line-height:1.4;flex:1">
+                                        已支付但状态未更新？点击刷新查询支付结果
+                                    </div>
+                                    <button class="ldsp-order-refresh-btn" data-order="${order.order_no}" style="padding:6px 12px;background:#f59e0b;color:#fff;border:none;border-radius:var(--r-sm);font-size:10px;font-weight:600;cursor:pointer;white-space:nowrap">
+                                        🔄 刷新状态
+                                    </button>
                                 </div>
-                                <button class="ldsp-order-refresh-btn" data-order="${order.order_no}" style="padding:8px 16px;background:#f59e0b;color:#fff;border:none;border-radius:var(--r-sm);font-size:11px;font-weight:600;cursor:pointer">
-                                    🔄 刷新支付状态
-                                </button>
                             </div>
                         ` : ''}
                         ${order.status === 'delivered' && order.deliveryContent ? `
@@ -8853,11 +8856,11 @@
                         ` : ''}
                         ${logs.length > 0 ? `
                             <div class="ldsp-order-logs">
-                                <div class="ldsp-order-logs-title">📋 订单记录</div>
-                                ${logs.map(log => `
+                                <div class="ldsp-order-logs-title">📋 订单记录 (${logs.length})</div>
+                                ${logs.slice(0, 5).map(log => `
                                     <div class="ldsp-order-log-item">
                                         <span class="ldsp-order-log-action">${Utils.escapeHtml(log.action)}</span>
-                                        <span class="ldsp-order-log-time">${new Date(log.created_at).toLocaleString('zh-CN')}</span>
+                                        <span class="ldsp-order-log-time">${new Date(log.created_at).toLocaleString('zh-CN', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}</span>
                                     </div>
                                 `).join('')}
                             </div>
