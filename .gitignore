@@ -7,10 +7,11 @@ Todo.md
 !update_log.md
 backend
 admin-panel
-docs
+/docs
 scripts
 
 # website 构建产物和依赖
+!website/docs/*.md
 website/node_modules
 website/dist
 website/.wrangler
