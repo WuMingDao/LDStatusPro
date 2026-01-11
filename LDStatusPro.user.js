@@ -4446,6 +4446,8 @@
     .ldsp-shop-form-select:focus{border-color:var(--accent);outline:none}
     .ldsp-shop-form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
     .ldsp-shop-form-hint{font-size:9px;color:var(--txt-mut);margin-top:2px}
+    .ldsp-shop-form-hint-selectable{user-select:text!important;-webkit-user-select:text!important}
+    .ldsp-shop-form-hint a{color:var(--link);text-decoration:underline;user-select:text!important}
     .ldsp-shop-form-optional{font-size:9px;font-weight:400;color:var(--txt-mut)}
     .ldsp-shop-form-actions{display:flex;gap:8px;margin-top:auto;padding-top:10px;flex-shrink:0}
     .ldsp-shop-form-btn{flex:1;padding:10px;border:none;border-radius:var(--r-sm);font-size:12px;font-weight:600;cursor:pointer;transition:all .15s}
@@ -7880,7 +7882,7 @@
                         <div class="ldsp-shop-form-group ldsp-shop-type-link${isLinkType ? '' : ' hidden'}">
                             <label class="ldsp-shop-form-label">积分流转链接 <span class="required">*</span></label>
                             <input type="url" class="ldsp-shop-form-input" id="shop-payment-url" placeholder="https://credit.linux.do/paying/..." value="${Utils.escapeHtml(p.payment_link || '')}">
-                            <span class="ldsp-shop-form-hint">LDC 积分流转链接，买家点击兑换后跳转此链接</span>
+                            <span class="ldsp-shop-form-hint ldsp-shop-form-hint-selectable">LDC积分流转链接，获取可参照：<a href="https://linux.do/t/topic/1356124" target="_blank" rel="noopener">创建自己的积分流转链接</a></span>
                         </div>
                         <div class="ldsp-shop-form-group ldsp-shop-type-cdk${!isLinkType ? '' : ' hidden'}">
                             <label class="ldsp-shop-form-label">CDK 卡密 <span class="ldsp-shop-form-optional">(可选)</span></label>
